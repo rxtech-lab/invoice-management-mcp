@@ -598,7 +598,35 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT token for authentication
+      description: |
+        JWT Bearer token authentication.
+
+        Obtain a JWT token from your OAuth/OIDC provider and include it in the
+        Authorization header as: `Authorization: Bearer <token>`
+
+        The JWT must:
+        - Be signed with RS256, RS384, RS512, ES256, ES384, or ES512
+        - Have a valid `sub` (subject) claim identifying the user
+        - Not be expired
+
+        Optional claims:
+        - `roles` or `role`: User roles for authorization
+        - `scope` or `scp`: OAuth scopes
+
+    OAuth2:
+      type: oauth2
+      description: OAuth 2.0 authentication flow
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/authorize
+          tokenUrl: https://auth.example.com/token
+          scopes:
+            read:invoices: Read invoices
+            write:invoices: Create, update, delete invoices
+            read:categories: Read categories
+            write:categories: Create, update, delete categories
+            read:companies: Read companies
+            write:companies: Create, update, delete companies
 
   parameters:
     CategoryId:
@@ -1125,3 +1153,10 @@ components:
 
 security:
   - BearerAuth: []
+  - OAuth2:
+      - read:invoices
+      - write:invoices
+      - read:categories
+      - write:categories
+      - read:companies
+      - write:companies

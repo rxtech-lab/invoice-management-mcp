@@ -30,6 +30,7 @@ type APIServer struct {
 	uploadService          services.UploadService
 	mcpServer              *mcpserver.MCPServer
 	mcprouterAuthenticator *auth.ApikeyAuthenticator
+	oauthAuthenticator     *middleware.OAuthAuthenticator
 	port                   int
 	authenticationEnabled  bool
 }
@@ -60,8 +61,29 @@ func NewAPIServer(
 	if os.Getenv("MCPROUTER_SERVER_URL") != "" {
 		mcprouterAuthenticator = auth.NewApikeyAuthenticator(os.Getenv("MCPROUTER_SERVER_URL"), http.DefaultClient)
 		log.Println("MCPRouter authenticator initialized")
-	} else {
-		log.Println("Warning: MCPROUTER_SERVER_URL not set, authentication disabled")
+	}
+
+	// Initialize OAuth authenticator
+	var oauthAuthenticator *middleware.OAuthAuthenticator
+	if oauthServerURL := os.Getenv("OAUTH_SERVER_URL"); oauthServerURL != "" {
+		jwksEndpoint := oauthServerURL + "/.well-known/jwks.json"
+		config := middleware.OAuthConfig{
+			JWKSEndpoint: jwksEndpoint,
+			Issuer:       os.Getenv("OAUTH_ISSUER"),
+			Audience:     os.Getenv("OAUTH_AUDIENCE"),
+		}
+
+		var err error
+		oauthAuthenticator, err = middleware.NewOAuthAuthenticator(config)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize OAuth authenticator: %v", err)
+		} else {
+			log.Println("OAuth authenticator initialized")
+		}
+	}
+
+	if mcprouterAuthenticator == nil && oauthAuthenticator == nil {
+		log.Println("Warning: No authentication configured (MCPROUTER_SERVER_URL or OAUTH_SERVER_URL not set)")
 	}
 
 	srv := &APIServer{
@@ -73,6 +95,7 @@ func NewAPIServer(
 		uploadService:          uploadService,
 		mcpServer:              mcpServer,
 		mcprouterAuthenticator: mcprouterAuthenticator,
+		oauthAuthenticator:     oauthAuthenticator,
 	}
 	return srv
 }
@@ -141,22 +164,37 @@ func (s *APIServer) SetupRoutes() {
 	api.Get("/upload/presigned", s.handleGetPresignedURL)
 }
 
-// EnableAuthentication enables MCPRouter authentication middleware
+// EnableAuthentication enables authentication middleware (OAuth and/or MCPRouter)
 func (s *APIServer) EnableAuthentication() error {
 	s.authenticationEnabled = true
 
+	// OAuth Bearer token authentication (applied first, takes priority)
+	if s.oauthAuthenticator != nil {
+		log.Println("OAuth Bearer token authentication enabled")
+		s.app.Use(middleware.FiberOAuthMiddleware(s.oauthAuthenticator, func(c *fiber.Ctx, user *utils.AuthenticatedUser) error {
+			c.Locals(middleware.AuthenticatedUserContextKey, user)
+			return nil
+		}))
+	}
+
+	// MCPRouter API key authentication (as fallback/alternative)
 	if s.mcprouterAuthenticator != nil {
 		log.Println("MCPRouter authentication enabled")
 		s.app.Use(auth2.FiberApikeyMiddleware(s.mcprouterAuthenticator, os.Getenv("MCPROUTER_SERVER_API_KEY"), func(c *fiber.Ctx, user *types.User) error {
-			authenticatedUser := &utils.AuthenticatedUser{
-				Sub:   user.ID,
-				Roles: []string{user.Role},
+			// Only set user if not already authenticated (OAuth takes priority)
+			if c.Locals(middleware.AuthenticatedUserContextKey) == nil {
+				authenticatedUser := &utils.AuthenticatedUser{
+					Sub:   user.ID,
+					Roles: []string{user.Role},
+				}
+				c.Locals(middleware.AuthenticatedUserContextKey, authenticatedUser)
 			}
-			c.Locals(middleware.AuthenticatedUserContextKey, authenticatedUser)
 			return nil
 		}))
-	} else {
-		log.Println("Warning: MCPRouter authenticator not configured, authentication skipped")
+	}
+
+	if s.oauthAuthenticator == nil && s.mcprouterAuthenticator == nil {
+		log.Println("Warning: No authenticator configured, authentication skipped")
 	}
 
 	return nil
@@ -219,6 +257,9 @@ func (s *APIServer) StartAsync(port *int) (int, error) {
 
 // Shutdown gracefully shuts down the server
 func (s *APIServer) Shutdown() error {
+	if s.oauthAuthenticator != nil {
+		s.oauthAuthenticator.Close()
+	}
 	return s.app.Shutdown()
 }
 

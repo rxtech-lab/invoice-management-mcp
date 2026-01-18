@@ -56,11 +56,11 @@ func main() {
 	)
 
 	// Enable authentication if configured (must be before routes)
-	if os.Getenv("MCPROUTER_SERVER_URL") != "" {
+	if os.Getenv("OAUTH_SERVER_URL") != "" || os.Getenv("MCPROUTER_SERVER_URL") != "" {
 		if err := apiServer.EnableAuthentication(); err != nil {
 			log.Printf("Warning: Failed to enable authentication: %v", err)
 		} else {
-			log.Println("Authentication enabled via MCPRouter")
+			log.Println("Authentication enabled")
 		}
 	}
 
