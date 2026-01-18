@@ -55,10 +55,7 @@ func main() {
 		mcpSrv.GetServer(),
 	)
 
-	// Setup routes
-	apiServer.SetupRoutes()
-
-	// Enable authentication if configured
+	// Enable authentication if configured (must be before routes)
 	if os.Getenv("MCPROUTER_SERVER_URL") != "" {
 		if err := apiServer.EnableAuthentication(); err != nil {
 			log.Printf("Warning: Failed to enable authentication: %v", err)
@@ -66,6 +63,9 @@ func main() {
 			log.Println("Authentication enabled via MCPRouter")
 		}
 	}
+
+	// Setup routes (after authentication middleware)
+	apiServer.SetupRoutes()
 
 	// Enable StreamableHTTP for MCP
 	apiServer.EnableStreamableHTTP()
