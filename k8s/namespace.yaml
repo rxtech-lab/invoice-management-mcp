@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: invoice-management
+  labels:
+    name: invoice-management
+    app.kubernetes.io/name: invoice-management
+    app.kubernetes.io/managed-by: kustomize

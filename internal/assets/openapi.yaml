@@ -1,0 +1,1127 @@
+openapi: 3.0.3
+info:
+  title: Invoice Management API
+  description: API for managing invoices, categories, companies, and file uploads
+  version: 1.0.0
+  contact:
+    name: RxTech Lab
+    url: https://github.com/rxtech-lab/invoice-management
+
+servers:
+  - url: /api
+    description: API server
+
+tags:
+  - name: Categories
+    description: Invoice category management
+  - name: Companies
+    description: Company/vendor management
+  - name: Invoices
+    description: Invoice management
+  - name: Invoice Items
+    description: Invoice line items
+  - name: Upload
+    description: File upload operations
+  - name: Health
+    description: Health check endpoints
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the health status of the service
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/categories:
+    get:
+      tags:
+        - Categories
+      summary: List categories
+      description: Returns a paginated list of categories with optional search
+      operationId: listCategories
+      parameters:
+        - name: keyword
+          in: query
+          description: Search keyword for category name
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Categories
+      summary: Create category
+      description: Creates a new invoice category
+      operationId: createCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: Get category
+      description: Returns a category by ID
+      operationId: getCategory
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '200':
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Categories
+      summary: Update category
+      description: Updates an existing category
+      operationId: updateCategory
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCategoryRequest'
+      responses:
+        '200':
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - Categories
+      summary: Delete category
+      description: Deletes a category
+      operationId: deleteCategory
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '204':
+          description: Category deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/companies:
+    get:
+      tags:
+        - Companies
+      summary: List companies
+      description: Returns a paginated list of companies with optional search
+      operationId: listCompanies
+      parameters:
+        - name: keyword
+          in: query
+          description: Search keyword for company name
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Companies
+      summary: Create company
+      description: Creates a new company/vendor
+      operationId: createCompany
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCompanyRequest'
+      responses:
+        '201':
+          description: Company created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/companies/{id}:
+    get:
+      tags:
+        - Companies
+      summary: Get company
+      description: Returns a company by ID
+      operationId: getCompany
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      responses:
+        '200':
+          description: Company details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Companies
+      summary: Update company
+      description: Updates an existing company
+      operationId: updateCompany
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCompanyRequest'
+      responses:
+        '200':
+          description: Company updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - Companies
+      summary: Delete company
+      description: Deletes a company
+      operationId: deleteCompany
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      responses:
+        '204':
+          description: Company deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/invoices:
+    get:
+      tags:
+        - Invoices
+      summary: List invoices
+      description: Returns a paginated list of invoices with filtering and sorting
+      operationId: listInvoices
+      parameters:
+        - name: keyword
+          in: query
+          description: Search keyword for invoice title or description
+          schema:
+            type: string
+        - name: category_id
+          in: query
+          description: Filter by category ID
+          schema:
+            type: integer
+        - name: company_id
+          in: query
+          description: Filter by company ID
+          schema:
+            type: integer
+        - name: status
+          in: query
+          description: Filter by invoice status
+          schema:
+            $ref: '#/components/schemas/InvoiceStatus'
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [created_at, updated_at, amount, due_date, title]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Invoices
+      summary: Create invoice
+      description: Creates a new invoice with optional line items
+      operationId: createInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/invoices/{id}:
+    get:
+      tags:
+        - Invoices
+      summary: Get invoice
+      description: Returns an invoice by ID including items
+      operationId: getInvoice
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Invoices
+      summary: Update invoice
+      description: Updates an existing invoice
+      operationId: updateInvoice
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInvoiceRequest'
+      responses:
+        '200':
+          description: Invoice updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - Invoices
+      summary: Delete invoice
+      description: Deletes an invoice and its items
+      operationId: deleteInvoice
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      responses:
+        '204':
+          description: Invoice deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/invoices/{id}/status:
+    patch:
+      tags:
+        - Invoices
+      summary: Update invoice status
+      description: Updates only the status of an invoice
+      operationId: updateInvoiceStatus
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStatusRequest'
+      responses:
+        '200':
+          description: Invoice status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/invoices/{id}/items:
+    post:
+      tags:
+        - Invoice Items
+      summary: Add invoice item
+      description: Adds a line item to an invoice
+      operationId: addInvoiceItem
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddItemRequest'
+      responses:
+        '201':
+          description: Item added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/invoices/{invoice_id}/items/{item_id}:
+    put:
+      tags:
+        - Invoice Items
+      summary: Update invoice item
+      description: Updates a line item in an invoice
+      operationId: updateInvoiceItem
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          description: Invoice ID
+          schema:
+            type: integer
+        - name: item_id
+          in: path
+          required: true
+          description: Item ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemRequest'
+      responses:
+        '200':
+          description: Item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - Invoice Items
+      summary: Delete invoice item
+      description: Deletes a line item from an invoice
+      operationId: deleteInvoiceItem
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          description: Invoice ID
+          schema:
+            type: integer
+        - name: item_id
+          in: path
+          required: true
+          description: Item ID
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Item deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/upload:
+    post:
+      tags:
+        - Upload
+      summary: Upload file
+      description: Uploads a file to S3-compatible storage
+      operationId: uploadFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload
+      responses:
+        '201':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/upload/presigned:
+    get:
+      tags:
+        - Upload
+      summary: Get presigned upload URL
+      description: Generates a presigned URL for direct upload to S3
+      operationId: getPresignedURL
+      parameters:
+        - name: filename
+          in: query
+          required: true
+          description: Name of the file to upload
+          schema:
+            type: string
+        - name: content_type
+          in: query
+          description: MIME type of the file
+          schema:
+            type: string
+            default: application/octet-stream
+      responses:
+        '200':
+          description: Presigned URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedURLResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  parameters:
+    CategoryId:
+      name: id
+      in: path
+      required: true
+      description: Category ID
+      schema:
+        type: integer
+
+    CompanyId:
+      name: id
+      in: path
+      required: true
+      description: Company ID
+      schema:
+        type: integer
+
+    InvoiceId:
+      name: id
+      in: path
+      required: true
+      description: Invoice ID
+      schema:
+        type: integer
+
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of items to return
+      schema:
+        type: integer
+        default: 50
+        minimum: 1
+        maximum: 100
+
+    Offset:
+      name: offset
+      in: query
+      description: Number of items to skip
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Category ID
+        user_id:
+          type: string
+          description: Owner user ID
+        name:
+          type: string
+          description: Category name
+        description:
+          type: string
+          description: Category description
+        color:
+          type: string
+          description: Hex color code (e.g., #FF5733)
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCategoryRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Category name
+        description:
+          type: string
+          description: Category description
+        color:
+          type: string
+          description: Hex color code
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Category name
+        description:
+          type: string
+          description: Category description
+        color:
+          type: string
+          description: Hex color code
+
+    CategoryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    Company:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Company ID
+        user_id:
+          type: string
+          description: Owner user ID
+        name:
+          type: string
+          description: Company name
+        address:
+          type: string
+          description: Company address
+        email:
+          type: string
+          format: email
+          description: Contact email
+        phone:
+          type: string
+          description: Contact phone
+        website:
+          type: string
+          format: uri
+          description: Company website
+        tax_id:
+          type: string
+          description: Tax identification number
+        notes:
+          type: string
+          description: Additional notes
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCompanyRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Company name
+        address:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        website:
+          type: string
+          format: uri
+        tax_id:
+          type: string
+        notes:
+          type: string
+
+    UpdateCompanyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        website:
+          type: string
+          format: uri
+        tax_id:
+          type: string
+        notes:
+          type: string
+
+    CompanyListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Company'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    InvoiceStatus:
+      type: string
+      enum:
+        - paid
+        - unpaid
+        - overdue
+
+    InvoiceItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Item ID
+        invoice_id:
+          type: integer
+          description: Parent invoice ID
+        description:
+          type: string
+          description: Item description
+        quantity:
+          type: number
+          format: double
+          description: Quantity
+        unit_price:
+          type: number
+          format: double
+          description: Unit price
+        amount:
+          type: number
+          format: double
+          description: Total amount (quantity * unit_price)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Invoice ID
+        user_id:
+          type: string
+          description: Owner user ID
+        title:
+          type: string
+          description: Invoice title
+        description:
+          type: string
+          description: Invoice description
+        invoice_started_at:
+          type: string
+          format: date-time
+          description: Billing cycle start date
+        invoice_ended_at:
+          type: string
+          format: date-time
+          description: Billing cycle end date
+        amount:
+          type: number
+          format: double
+          description: Total amount
+        currency:
+          type: string
+          description: Currency code (e.g., USD)
+          default: USD
+        category_id:
+          type: integer
+          description: Category ID
+        category:
+          $ref: '#/components/schemas/Category'
+        company_id:
+          type: integer
+          description: Company ID
+        company:
+          $ref: '#/components/schemas/Company'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceItem'
+        original_download_link:
+          type: string
+          format: uri
+          description: Original invoice file URL
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags for categorization
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+        due_date:
+          type: string
+          format: date-time
+          description: Payment due date
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          description: Invoice title
+        description:
+          type: string
+        invoice_started_at:
+          type: string
+          format: date-time
+        invoice_ended_at:
+          type: string
+          format: date-time
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+          default: USD
+        category_id:
+          type: integer
+        company_id:
+          type: integer
+        original_download_link:
+          type: string
+          format: uri
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+        due_date:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateItemRequest'
+
+    CreateItemRequest:
+      type: object
+      required:
+        - description
+      properties:
+        description:
+          type: string
+          description: Item description
+        quantity:
+          type: number
+          format: double
+          default: 1
+        unit_price:
+          type: number
+          format: double
+          default: 0
+
+    UpdateInvoiceRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        invoice_started_at:
+          type: string
+          format: date-time
+        invoice_ended_at:
+          type: string
+          format: date-time
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        category_id:
+          type: integer
+        company_id:
+          type: integer
+        original_download_link:
+          type: string
+          format: uri
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+        due_date:
+          type: string
+          format: date-time
+
+    UpdateStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+
+    AddItemRequest:
+      type: object
+      required:
+        - description
+      properties:
+        description:
+          type: string
+          description: Item description
+        quantity:
+          type: number
+          format: double
+          default: 1
+        unit_price:
+          type: number
+          format: double
+          default: 0
+
+    UpdateItemRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        quantity:
+          type: number
+          format: double
+        unit_price:
+          type: number
+          format: double
+
+    InvoiceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    UploadResponse:
+      type: object
+      properties:
+        key:
+          type: string
+          description: S3 object key
+        download_url:
+          type: string
+          format: uri
+          description: Download URL for the file
+        filename:
+          type: string
+          description: Original filename
+        size:
+          type: integer
+          description: File size in bytes
+        content_type:
+          type: string
+          description: MIME type
+
+    PresignedURLResponse:
+      type: object
+      properties:
+        upload_url:
+          type: string
+          format: uri
+          description: Presigned URL for upload
+        key:
+          type: string
+          description: S3 object key
+        content_type:
+          type: string
+          description: MIME type
+
+security:
+  - BearerAuth: []

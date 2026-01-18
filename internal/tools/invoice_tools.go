@@ -1,0 +1,427 @@
+package tools
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/invoice-management/internal/models"
+	"github.com/rxtech-lab/invoice-management/internal/services"
+)
+
+// CreateInvoiceTool handles invoice creation
+type CreateInvoiceTool struct {
+	service services.InvoiceService
+}
+
+func NewCreateInvoiceTool(service services.InvoiceService) *CreateInvoiceTool {
+	return &CreateInvoiceTool{service: service}
+}
+
+func (t *CreateInvoiceTool) GetTool() mcp.Tool {
+	return mcp.NewTool("create_invoice",
+		mcp.WithDescription("Create a new invoice"),
+		mcp.WithString("title", mcp.Required(), mcp.Description("Invoice title")),
+		mcp.WithString("description", mcp.Description("Invoice description")),
+		mcp.WithNumber("amount", mcp.Description("Total amount")),
+		mcp.WithString("currency", mcp.Description("Currency code (default: USD)")),
+		mcp.WithNumber("category_id", mcp.Description("Category ID")),
+		mcp.WithNumber("company_id", mcp.Description("Company ID")),
+		mcp.WithString("invoice_started_at", mcp.Description("Billing cycle start (RFC3339)")),
+		mcp.WithString("invoice_ended_at", mcp.Description("Billing cycle end (RFC3339)")),
+		mcp.WithString("original_download_link", mcp.Description("Link to original invoice file")),
+		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue (default: unpaid)")),
+		mcp.WithString("due_date", mcp.Description("Due date (RFC3339)")),
+	)
+}
+
+func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		userID := getUserIDFromContext(ctx)
+		if userID == "" {
+			return mcp.NewToolResultError("Authentication required"), nil
+		}
+
+		args := getArgsMap(request.Params.Arguments)
+		title, _ := args["title"].(string)
+		description, _ := args["description"].(string)
+		amount := getFloatArg(args, "amount", 0)
+		currency, _ := args["currency"].(string)
+		if currency == "" {
+			currency = "USD"
+		}
+
+		categoryID := getUintPtrArg(args, "category_id")
+		companyID := getUintPtrArg(args, "company_id")
+		originalDownloadLink, _ := args["original_download_link"].(string)
+
+		statusStr, _ := args["status"].(string)
+		status := models.InvoiceStatusUnpaid
+		if statusStr != "" {
+			status = models.InvoiceStatus(statusStr)
+		}
+
+		invoiceStartedAt := parseTimeArg(args, "invoice_started_at")
+		invoiceEndedAt := parseTimeArg(args, "invoice_ended_at")
+		dueDate := parseTimeArg(args, "due_date")
+
+		invoice := &models.Invoice{
+			Title:                title,
+			Description:          description,
+			Amount:               amount,
+			Currency:             currency,
+			CategoryID:           categoryID,
+			CompanyID:            companyID,
+			InvoiceStartedAt:     invoiceStartedAt,
+			InvoiceEndedAt:       invoiceEndedAt,
+			OriginalDownloadLink: originalDownloadLink,
+			Status:               status,
+			DueDate:              dueDate,
+		}
+
+		if err := t.service.CreateInvoice(userID, invoice); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to create invoice: %v", err)), nil
+		}
+
+		created, _ := t.service.GetInvoiceByID(userID, invoice.ID)
+		result, _ := json.Marshal(created)
+		return mcp.NewToolResultText(string(result)), nil
+	}
+}
+
+// ListInvoicesTool handles listing invoices
+type ListInvoicesTool struct {
+	service services.InvoiceService
+}
+
+func NewListInvoicesTool(service services.InvoiceService) *ListInvoicesTool {
+	return &ListInvoicesTool{service: service}
+}
+
+func (t *ListInvoicesTool) GetTool() mcp.Tool {
+	return mcp.NewTool("list_invoices",
+		mcp.WithDescription("List invoices with filtering and sorting"),
+		mcp.WithString("keyword", mcp.Description("Search keyword")),
+		mcp.WithNumber("category_id", mcp.Description("Filter by category ID")),
+		mcp.WithNumber("company_id", mcp.Description("Filter by company ID")),
+		mcp.WithString("status", mcp.Description("Filter by status: paid, unpaid, overdue")),
+		mcp.WithString("sort_by", mcp.Description("Sort by: created_at, amount, due_date, title")),
+		mcp.WithString("sort_order", mcp.Description("Sort order: asc, desc")),
+		mcp.WithNumber("limit", mcp.Description("Maximum results (default 50)")),
+		mcp.WithNumber("offset", mcp.Description("Offset for pagination")),
+	)
+}
+
+func (t *ListInvoicesTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		userID := getUserIDFromContext(ctx)
+		if userID == "" {
+			return mcp.NewToolResultError("Authentication required"), nil
+		}
+
+		args := getArgsMap(request.Params.Arguments)
+		opts := services.InvoiceListOptions{
+			Keyword:   getStringArg(args, "keyword"),
+			SortBy:    getStringArg(args, "sort_by"),
+			SortOrder: getStringArg(args, "sort_order"),
+			Limit:     getIntArg(args, "limit", 50),
+			Offset:    getIntArg(args, "offset", 0),
+		}
+
+		if categoryID := getUintPtrArg(args, "category_id"); categoryID != nil {
+			opts.CategoryID = categoryID
+		}
+		if companyID := getUintPtrArg(args, "company_id"); companyID != nil {
+			opts.CompanyID = companyID
+		}
+		if statusStr := getStringArg(args, "status"); statusStr != "" {
+			status := models.InvoiceStatus(statusStr)
+			opts.Status = &status
+		}
+
+		invoices, total, err := t.service.ListInvoices(userID, opts)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to list invoices: %v", err)), nil
+		}
+
+		result, _ := json.Marshal(map[string]interface{}{
+			"data":   invoices,
+			"total":  total,
+			"limit":  opts.Limit,
+			"offset": opts.Offset,
+		})
+		return mcp.NewToolResultText(string(result)), nil
+	}
+}
+
+// GetInvoiceTool handles getting a single invoice
+type GetInvoiceTool struct {
+	service services.InvoiceService
+}
+
+func NewGetInvoiceTool(service services.InvoiceService) *GetInvoiceTool {
+	return &GetInvoiceTool{service: service}
+}
+
+func (t *GetInvoiceTool) GetTool() mcp.Tool {
+	return mcp.NewTool("get_invoice",
+		mcp.WithDescription("Get an invoice by ID with all details"),
+		mcp.WithNumber("invoice_id", mcp.Required(), mcp.Description("Invoice ID")),
+	)
+}
+
+func (t *GetInvoiceTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		userID := getUserIDFromContext(ctx)
+		if userID == "" {
+			return mcp.NewToolResultError("Authentication required"), nil
+		}
+
+		args := getArgsMap(request.Params.Arguments)
+		invoiceID := getUintArg(args, "invoice_id")
+		if invoiceID == 0 {
+			return mcp.NewToolResultError("invoice_id is required"), nil
+		}
+
+		invoice, err := t.service.GetInvoiceByID(userID, invoiceID)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invoice not found: %v", err)), nil
+		}
+
+		result, _ := json.Marshal(invoice)
+		return mcp.NewToolResultText(string(result)), nil
+	}
+}
+
+// UpdateInvoiceTool handles invoice updates
+type UpdateInvoiceTool struct {
+	service services.InvoiceService
+}
+
+func NewUpdateInvoiceTool(service services.InvoiceService) *UpdateInvoiceTool {
+	return &UpdateInvoiceTool{service: service}
+}
+
+func (t *UpdateInvoiceTool) GetTool() mcp.Tool {
+	return mcp.NewTool("update_invoice",
+		mcp.WithDescription("Update an existing invoice"),
+		mcp.WithNumber("invoice_id", mcp.Required(), mcp.Description("Invoice ID")),
+		mcp.WithString("title", mcp.Description("Invoice title")),
+		mcp.WithString("description", mcp.Description("Invoice description")),
+		mcp.WithNumber("amount", mcp.Description("Total amount")),
+		mcp.WithString("currency", mcp.Description("Currency code")),
+		mcp.WithNumber("category_id", mcp.Description("Category ID")),
+		mcp.WithNumber("company_id", mcp.Description("Company ID")),
+		mcp.WithString("original_download_link", mcp.Description("Link to original invoice file")),
+		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue")),
+		mcp.WithString("due_date", mcp.Description("Due date (RFC3339)")),
+	)
+}
+
+func (t *UpdateInvoiceTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		userID := getUserIDFromContext(ctx)
+		if userID == "" {
+			return mcp.NewToolResultError("Authentication required"), nil
+		}
+
+		args := getArgsMap(request.Params.Arguments)
+		invoiceID := getUintArg(args, "invoice_id")
+		if invoiceID == 0 {
+			return mcp.NewToolResultError("invoice_id is required"), nil
+		}
+
+		title, _ := args["title"].(string)
+		description, _ := args["description"].(string)
+		amount := getFloatArg(args, "amount", 0)
+		currency, _ := args["currency"].(string)
+		originalDownloadLink, _ := args["original_download_link"].(string)
+
+		statusStr, _ := args["status"].(string)
+		status := models.InvoiceStatus(statusStr)
+
+		dueDate := parseTimeArg(args, "due_date")
+
+		invoice := &models.Invoice{
+			ID:                   invoiceID,
+			Title:                title,
+			Description:          description,
+			Amount:               amount,
+			Currency:             currency,
+			CategoryID:           getUintPtrArg(args, "category_id"),
+			CompanyID:            getUintPtrArg(args, "company_id"),
+			OriginalDownloadLink: originalDownloadLink,
+			Status:               status,
+			DueDate:              dueDate,
+		}
+
+		if err := t.service.UpdateInvoice(userID, invoice); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to update invoice: %v", err)), nil
+		}
+
+		updated, _ := t.service.GetInvoiceByID(userID, invoiceID)
+		result, _ := json.Marshal(updated)
+		return mcp.NewToolResultText(string(result)), nil
+	}
+}
+
+// DeleteInvoiceTool handles invoice deletion
+type DeleteInvoiceTool struct {
+	service services.InvoiceService
+}
+
+func NewDeleteInvoiceTool(service services.InvoiceService) *DeleteInvoiceTool {
+	return &DeleteInvoiceTool{service: service}
+}
+
+func (t *DeleteInvoiceTool) GetTool() mcp.Tool {
+	return mcp.NewTool("delete_invoice",
+		mcp.WithDescription("Delete an invoice"),
+		mcp.WithNumber("invoice_id", mcp.Required(), mcp.Description("Invoice ID")),
+	)
+}
+
+func (t *DeleteInvoiceTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		userID := getUserIDFromContext(ctx)
+		if userID == "" {
+			return mcp.NewToolResultError("Authentication required"), nil
+		}
+
+		args := getArgsMap(request.Params.Arguments)
+		invoiceID := getUintArg(args, "invoice_id")
+		if invoiceID == 0 {
+			return mcp.NewToolResultError("invoice_id is required"), nil
+		}
+
+		if err := t.service.DeleteInvoice(userID, invoiceID); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to delete invoice: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(`{"success": true, "message": "Invoice deleted"}`), nil
+	}
+}
+
+// SearchInvoicesTool handles invoice search
+type SearchInvoicesTool struct {
+	service services.InvoiceService
+}
+
+func NewSearchInvoicesTool(service services.InvoiceService) *SearchInvoicesTool {
+	return &SearchInvoicesTool{service: service}
+}
+
+func (t *SearchInvoicesTool) GetTool() mcp.Tool {
+	return mcp.NewTool("search_invoices",
+		mcp.WithDescription("Full-text search across invoices"),
+		mcp.WithString("query", mcp.Required(), mcp.Description("Search query")),
+	)
+}
+
+func (t *SearchInvoicesTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		userID := getUserIDFromContext(ctx)
+		if userID == "" {
+			return mcp.NewToolResultError("Authentication required"), nil
+		}
+
+		args := getArgsMap(request.Params.Arguments)
+		query, _ := args["query"].(string)
+		if query == "" {
+			return mcp.NewToolResultError("query is required"), nil
+		}
+
+		invoices, err := t.service.SearchInvoices(userID, query)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Search failed: %v", err)), nil
+		}
+
+		result, _ := json.Marshal(map[string]interface{}{
+			"data":  invoices,
+			"count": len(invoices),
+		})
+		return mcp.NewToolResultText(string(result)), nil
+	}
+}
+
+// UpdateInvoiceStatusTool handles status updates
+type UpdateInvoiceStatusTool struct {
+	service services.InvoiceService
+}
+
+func NewUpdateInvoiceStatusTool(service services.InvoiceService) *UpdateInvoiceStatusTool {
+	return &UpdateInvoiceStatusTool{service: service}
+}
+
+func (t *UpdateInvoiceStatusTool) GetTool() mcp.Tool {
+	return mcp.NewTool("update_invoice_status",
+		mcp.WithDescription("Update only the status of an invoice"),
+		mcp.WithNumber("invoice_id", mcp.Required(), mcp.Description("Invoice ID")),
+		mcp.WithString("status", mcp.Required(), mcp.Description("New status: paid, unpaid, overdue")),
+	)
+}
+
+func (t *UpdateInvoiceStatusTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		userID := getUserIDFromContext(ctx)
+		if userID == "" {
+			return mcp.NewToolResultError("Authentication required"), nil
+		}
+
+		args := getArgsMap(request.Params.Arguments)
+		invoiceID := getUintArg(args, "invoice_id")
+		if invoiceID == 0 {
+			return mcp.NewToolResultError("invoice_id is required"), nil
+		}
+
+		statusStr, _ := args["status"].(string)
+		if statusStr == "" {
+			return mcp.NewToolResultError("status is required"), nil
+		}
+
+		status := models.InvoiceStatus(statusStr)
+		if err := t.service.UpdateInvoiceStatus(userID, invoiceID, status); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to update status: %v", err)), nil
+		}
+
+		updated, _ := t.service.GetInvoiceByID(userID, invoiceID)
+		result, _ := json.Marshal(updated)
+		return mcp.NewToolResultText(string(result)), nil
+	}
+}
+
+// Helper functions
+func getStringArg(args map[string]interface{}, key string) string {
+	if v, ok := args[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func getFloatArg(args map[string]interface{}, key string, defaultVal float64) float64 {
+	if v, ok := args[key].(float64); ok {
+		return v
+	}
+	return defaultVal
+}
+
+func getUintPtrArg(args map[string]interface{}, key string) *uint {
+	if v, ok := args[key].(float64); ok && v > 0 {
+		id := uint(v)
+		return &id
+	}
+	return nil
+}
+
+func parseTimeArg(args map[string]interface{}, key string) *time.Time {
+	if v, ok := args[key].(string); ok && v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err == nil {
+			return &t
+		}
+	}
+	return nil
+}

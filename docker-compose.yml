@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  invoice-management:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT_HASH: ${COMMIT_HASH:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # Server
+      - PORT=${PORT:-8080}
+
+      # Database (Turso)
+      - TURSO_DATABASE_URL=${TURSO_DATABASE_URL:-}
+      - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN:-}
+      - SQLITE_DB_PATH=${SQLITE_DB_PATH:-/app/data/invoice.db}
+
+      # S3-compatible storage
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_USE_PATH_STYLE=${S3_USE_PATH_STYLE:-false}
+
+      # Authentication
+      - MCPROUTER_SERVER_URL=${MCPROUTER_SERVER_URL:-}
+      - MCPROUTER_SERVER_API_KEY=${MCPROUTER_SERVER_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - SCALEKIT_ENV_URL=${SCALEKIT_ENV_URL:-}
+    volumes:
+      # Mount data directory for SQLite persistence (when not using Turso)
+      - invoice_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional MinIO for local S3-compatible storage
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    profiles:
+      - minio
+
+volumes:
+  invoice_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  default:
+    name: invoice-network
