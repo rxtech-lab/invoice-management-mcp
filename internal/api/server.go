@@ -29,8 +29,6 @@ type APIServer struct {
 	invoiceService         services.InvoiceService
 	uploadService          services.UploadService
 	mcpServer              *mcpserver.MCPServer
-	authenticator          *utils.JwtAuthenticator
-	simpleAuthenticator    *utils.SimpleJwtAuthenticator
 	mcprouterAuthenticator *auth.ApikeyAuthenticator
 	port                   int
 	authenticationEnabled  bool
@@ -57,33 +55,13 @@ func NewAPIServer(
 		TimeZone:   "Local",
 	}))
 
-	// Get JWKS URI from environment variable (OAuth fallback)
-	jwksUri := os.Getenv("SCALEKIT_ENV_URL")
-	var authenticator *utils.JwtAuthenticator
-	if jwksUri != "" {
-		auth := utils.NewJwtAuthenticator(jwksUri)
-		authenticator = &auth
-		log.Printf("JWT authenticator initialized with JWKS URI: %s", jwksUri)
-	} else {
-		log.Println("Warning: SCALEKIT_ENV_URL not set, OAuth JWT authentication disabled")
-	}
-
-	var simpleAuthenticator *utils.SimpleJwtAuthenticator
-	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
-		auth, err := utils.NewSimpleJwtAuthenticator(jwtSecret)
-		if err != nil {
-			log.Printf("Warning: Failed to initialize simple JWT authenticator: %v", err)
-		} else {
-			simpleAuthenticator = &auth
-			log.Println("Simple JWT authenticator initialized")
-		}
-	} else {
-		log.Println("Warning: JWT_SECRET not set, simple JWT authentication disabled")
-	}
-
+	// Initialize MCPRouter authenticator
 	var mcprouterAuthenticator *auth.ApikeyAuthenticator
 	if os.Getenv("MCPROUTER_SERVER_URL") != "" {
 		mcprouterAuthenticator = auth.NewApikeyAuthenticator(os.Getenv("MCPROUTER_SERVER_URL"), http.DefaultClient)
+		log.Println("MCPRouter authenticator initialized")
+	} else {
+		log.Println("Warning: MCPROUTER_SERVER_URL not set, authentication disabled")
 	}
 
 	srv := &APIServer{
@@ -94,8 +72,6 @@ func NewAPIServer(
 		invoiceService:         invoiceService,
 		uploadService:          uploadService,
 		mcpServer:              mcpServer,
-		authenticator:          authenticator,
-		simpleAuthenticator:    simpleAuthenticator,
 		mcprouterAuthenticator: mcprouterAuthenticator,
 	}
 	return srv
@@ -165,12 +141,12 @@ func (s *APIServer) SetupRoutes() {
 	api.Get("/upload/presigned", s.handleGetPresignedURL)
 }
 
-// EnableAuthentication enables authentication middleware
+// EnableAuthentication enables MCPRouter authentication middleware
 func (s *APIServer) EnableAuthentication() error {
 	s.authenticationEnabled = true
 
 	if s.mcprouterAuthenticator != nil {
-		log.Printf("MCPRouter authenticator enabled")
+		log.Println("MCPRouter authentication enabled")
 		s.app.Use(auth2.FiberApikeyMiddleware(s.mcprouterAuthenticator, os.Getenv("MCPROUTER_SERVER_API_KEY"), func(c *fiber.Ctx, user *types.User) error {
 			authenticatedUser := &utils.AuthenticatedUser{
 				Sub:   user.ID,
@@ -179,27 +155,9 @@ func (s *APIServer) EnableAuthentication() error {
 			c.Locals(middleware.AuthenticatedUserContextKey, authenticatedUser)
 			return nil
 		}))
+	} else {
+		log.Println("Warning: MCPRouter authenticator not configured, authentication skipped")
 	}
-
-	// OAuth routes
-	s.app.Get("/.well-known/oauth-protected-resource/mcp", s.handleOAuthProtectedResource)
-
-	// JWT middleware
-	s.app.Use(middleware.JwtAuthMiddleware(s.simpleAuthenticator))
-
-	// OAuth middleware
-	s.app.Use(middleware.OauthAuthMiddleware(middleware.AuthConfig{
-		SkipWellKnown: true,
-		TokenValidator: func(token string, audience []string) (*utils.AuthenticatedUser, error) {
-			if s.authenticator != nil {
-				return s.authenticator.ValidateToken(token)
-			}
-			if token == "" {
-				return nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
-			}
-			return &utils.AuthenticatedUser{}, nil
-		},
-	}))
 
 	return nil
 }
@@ -215,7 +173,7 @@ func (s *APIServer) EnableStreamableHTTP() {
 
 	var mcpHandler fiber.Handler
 	if s.authenticationEnabled {
-		mcpHandler = s.createAuthenticatedMCPHandler(streamableServer, s.authenticator)
+		mcpHandler = s.createAuthenticatedMCPHandler(streamableServer)
 		log.Println("MCP handlers enabled with authentication")
 	} else {
 		mcpHandler = s.createUnauthenticatedMCPHandler(streamableServer)
@@ -285,7 +243,7 @@ func (s *APIServer) GetFiberApp() *fiber.App {
 }
 
 // createAuthenticatedMCPHandler creates a Fiber handler that enforces authentication
-func (s *APIServer) createAuthenticatedMCPHandler(streamableServer *mcpserver.StreamableHTTPServer, authenticator *utils.JwtAuthenticator) fiber.Handler {
+func (s *APIServer) createAuthenticatedMCPHandler(streamableServer *mcpserver.StreamableHTTPServer) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user := c.Locals(middleware.AuthenticatedUserContextKey)
 		if user == nil {

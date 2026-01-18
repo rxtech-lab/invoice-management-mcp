@@ -18,7 +18,6 @@ services:
       # Database (Turso)
       - TURSO_DATABASE_URL=${TURSO_DATABASE_URL:-}
       - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN:-}
-      - SQLITE_DB_PATH=${SQLITE_DB_PATH:-/app/data/invoice.db}
 
       # S3-compatible storage
       - S3_ENDPOINT=${S3_ENDPOINT:-}
@@ -31,8 +30,6 @@ services:
       # Authentication
       - MCPROUTER_SERVER_URL=${MCPROUTER_SERVER_URL:-}
       - MCPROUTER_SERVER_API_KEY=${MCPROUTER_SERVER_API_KEY:-}
-      - JWT_SECRET=${JWT_SECRET:-}
-      - SCALEKIT_ENV_URL=${SCALEKIT_ENV_URL:-}
     volumes:
       # Mount data directory for SQLite persistence (when not using Turso)
       - invoice_data:/app/data
