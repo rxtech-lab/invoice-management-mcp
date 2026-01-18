@@ -4,6 +4,13 @@ import (
 	"context"
 )
 
+// AuthenticatedUser represents an authenticated user from MCPRouter
+type AuthenticatedUser struct {
+	Sub    string   `json:"sub"`
+	Roles  []string `json:"roles"`
+	Scopes []string `json:"scopes"`
+}
+
 // MCPAuthenticatedUserContextKey is the context key for storing authenticated user in MCP contexts
 // This is separate from the Fiber middleware context key to avoid confusion
 const MCPAuthenticatedUserContextKey = "mcp_authenticated_user"

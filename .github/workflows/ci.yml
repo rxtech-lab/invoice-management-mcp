@@ -8,36 +8,20 @@ on:
 
 jobs:
   test:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
           check-latest: true
-      - uses: oven-sh/setup-bun@v2
+
       - name: Download dependencies
         run: make deps
-      - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
 
-      - name: Start local blockchain
-        run: |
-          anvil --host 0.0.0.0 &
-          sleep 5
-          # Verify anvil is running
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-            http://localhost:8545 | grep -q "result"
-      - uses: browser-actions/setup-chrome@v2
       - name: Format check
         run: |
           make fmt
@@ -46,11 +30,9 @@ jobs:
             git status --porcelain
             exit 1
           fi
-      - name: Install dependencies
-        run: make deps && make generate
 
       - name: Run build
-        run: make build-frontend && make build
+        run: make build
 
       - name: Run tests
         run: make test-coverage
@@ -63,7 +45,7 @@ jobs:
       - name: Verify build artifacts
         run: |
           ls -la bin/
-          file bin/launchpad-mcp
+          file bin/invoice-management
 
   docker-build:
     runs-on: ubuntu-latest

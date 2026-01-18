@@ -20,32 +20,30 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
           check-latest: true
-      - uses: oven-sh/setup-bun@v2
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential
 
       - name: Install dependencies
-        run: make deps && make generate
+        run: make deps
 
       - name: Build Ubuntu binary
-        run: make build-frontend && make build
+        run: make build
         env:
           VERSION: ${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
 
       - name: Copy binary to expected location
         run: |
           mkdir -p bin
-          cp bin/launchpad-mcp bin/launchpad-mcp_linux_amd64
+          cp bin/invoice-management bin/invoice-management_linux_amd64
 
       - name: List built binaries
         run: ls -la bin/
@@ -65,21 +63,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
           check-latest: true
-      - uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: make deps && make generate
+        run: make deps
 
       - name: Build the binary
-        run: make build-frontend && make build
+        run: make build
         env:
           VERSION: ${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
 
@@ -117,7 +112,7 @@ jobs:
         if: github.event_name == 'release'
         run: |
           mkdir -p assets
-          cp launchpad-mcp_macOS_arm64_*.pkg assets/ || true
+          cp invoice-management_macOS_arm64_*.pkg assets/ || true
           ls -la assets/
 
       - name: Upload macOS package as artifact
@@ -134,7 +129,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            assets/launchpad-mcp_macOS_arm64_*.pkg
+            assets/invoice-management_macOS_arm64_*.pkg
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-ubuntu-release:
@@ -157,15 +152,15 @@ jobs:
 
           # Create archives for each platform
           cd bin
-          for file in launchpad-mcp_*; do
+          for file in invoice-management_*; do
             if [[ "$file" == *.exe ]]; then
               # Windows binary
-              platform=$(echo "$file" | sed 's/launchpad-mcp_\(.*\)\.exe/\1/')
-              zip "../release-assets/launchpad-mcp_${platform}.zip" "$file"
+              platform=$(echo "$file" | sed 's/invoice-management_\(.*\)\.exe/\1/')
+              zip "../release-assets/invoice-management_${platform}.zip" "$file"
             else
               # Unix binary
-              platform=$(echo "$file" | sed 's/launchpad-mcp_\(.*\)/\1/')
-              tar -czf "../release-assets/launchpad-mcp_${platform}.tar.gz" "$file"
+              platform=$(echo "$file" | sed 's/invoice-management_\(.*\)/\1/')
+              tar -czf "../release-assets/invoice-management_${platform}.tar.gz" "$file"
             fi
           done
 
@@ -187,8 +182,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -207,7 +200,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/launchpad-mcp
+          images: ghcr.io/${{ github.repository_owner }}/invoice-management
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -272,12 +265,12 @@ jobs:
           kubectl kustomize . | kubectl apply -f -
 
           # Update the deployment with the specific release tag
-          kubectl set image deployment/launchpad-mcp launchpad-mcp=ghcr.io/rxtech-lab/launchpad-mcp:${VERSION} -n launchpad
+          kubectl set image deployment/invoice-management invoice-management=ghcr.io/rxtech-lab/invoice-management:${VERSION} -n invoice-management
 
           # Wait for rollout to complete
-          kubectl rollout status deployment/launchpad-mcp -n launchpad --timeout=300s
+          kubectl rollout status deployment/invoice-management -n invoice-management --timeout=300s
 
       - name: Verify deployment
         run: |
-          kubectl get pods -n launchpad -l app=launchpad-mcp
-          kubectl get service -n launchpad launchpad-mcp-service
+          kubectl get pods -n invoice-management -l app=invoice-management
+          kubectl get service -n invoice-management invoice-management-service
