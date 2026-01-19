@@ -46,6 +46,10 @@ func (h *StrictHandlers) CreateCategory(
 		return generated.CreateCategory401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
 	}
 
+	if request.Body.Name == "" {
+		return generated.CreateCategory400JSONResponse{BadRequestJSONResponse: badRequest("Name is required")}, nil
+	}
+
 	category := &models.InvoiceCategory{
 		Name:        request.Body.Name,
 		Description: deref(request.Body.Description),

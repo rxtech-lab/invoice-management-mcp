@@ -75,6 +75,10 @@ func (h *StrictHandlers) CreateInvoice(
 		return generated.CreateInvoice401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
 	}
 
+	if request.Body.Title == "" {
+		return generated.CreateInvoice400JSONResponse{BadRequestJSONResponse: badRequest("Title is required")}, nil
+	}
+
 	invoice := &models.Invoice{
 		Title:       request.Body.Title,
 		Description: deref(request.Body.Description),

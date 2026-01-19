@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
@@ -54,6 +55,20 @@ func NewAPIServer(
 ) *APIServer {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
+		// Custom error handler to properly handle errors from generated code
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			// Check if it's already a Fiber error
+			if e, ok := err.(*fiber.Error); ok {
+				return c.Status(e.Code).JSON(fiber.Map{"error": e.Message})
+			}
+			// For other errors (like from generated code), return 400 for validation errors
+			errMsg := err.Error()
+			if strings.HasPrefix(errMsg, "Query argument") || strings.HasPrefix(errMsg, "Path argument") {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": errMsg})
+			}
+			// Default to 500 for unexpected errors
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": errMsg})
+		},
 	})
 
 	// Add middleware

@@ -46,6 +46,10 @@ func (h *StrictHandlers) CreateCompany(
 		return generated.CreateCompany401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
 	}
 
+	if request.Body.Name == "" {
+		return generated.CreateCompany400JSONResponse{BadRequestJSONResponse: badRequest("Name is required")}, nil
+	}
+
 	company := &models.InvoiceCompany{
 		Name:    request.Body.Name,
 		Address: deref(request.Body.Address),

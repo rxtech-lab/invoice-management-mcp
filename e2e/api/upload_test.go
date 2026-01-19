@@ -52,9 +52,10 @@ func (s *UploadTestSuite) TestUploadFile() {
 	result, err := s.setup.ReadResponseBody(resp)
 	s.Require().NoError(err)
 
-	s.NotNil(result["download_url"])
 	s.NotNil(result["filename"])
 	s.NotNil(result["key"])
+	s.NotNil(result["size"])
+	s.NotNil(result["content_type"])
 }
 
 func (s *UploadTestSuite) TestUploadFileNoFile() {
