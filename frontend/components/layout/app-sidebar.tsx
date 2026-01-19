@@ -7,6 +7,7 @@ import {
   Building2,
   Tags,
   LayoutDashboard,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,6 +26,7 @@ const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Invoices", href: "/invoices", icon: FileText },
   { title: "Companies", href: "/companies", icon: Building2 },
+  { title: "Receivers", href: "/receivers", icon: Users },
   { title: "Categories", href: "/categories", icon: Tags },
 ];
 

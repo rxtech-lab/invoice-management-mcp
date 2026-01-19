@@ -19,15 +19,17 @@ import (
 
 // TestSetup contains all test dependencies
 type TestSetup struct {
-	t               *testing.T
-	DBService       services.DBService
-	CategoryService services.CategoryService
-	CompanyService  services.CompanyService
-	InvoiceService  services.InvoiceService
-	UploadService   services.UploadService
-	APIServer       *api.APIServer
-	App             *fiber.App
-	TestUserID      string
+	t                *testing.T
+	DBService        services.DBService
+	CategoryService  services.CategoryService
+	CompanyService   services.CompanyService
+	ReceiverService  services.ReceiverService
+	InvoiceService   services.InvoiceService
+	UploadService    services.UploadService
+	AnalyticsService services.AnalyticsService
+	APIServer        *api.APIServer
+	App              *fiber.App
+	TestUserID       string
 }
 
 // NewTestSetup creates a new test setup with in-memory database
@@ -41,16 +43,20 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	// Create services
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
+	receiverService := services.NewReceiverService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := services.NewMockUploadService()
+	analyticsService := services.NewAnalyticsService(db)
 
 	// Create API server
 	apiServer := api.NewAPIServer(
 		dbService,
 		categoryService,
 		companyService,
+		receiverService,
 		invoiceService,
 		uploadService,
+		analyticsService,
 		nil, // No MCP server for tests
 	)
 
@@ -61,15 +67,17 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	apiServer.SetupRoutes()
 
 	setup := &TestSetup{
-		t:               t,
-		DBService:       dbService,
-		CategoryService: categoryService,
-		CompanyService:  companyService,
-		InvoiceService:  invoiceService,
-		UploadService:   uploadService,
-		APIServer:       apiServer,
-		App:             apiServer.GetFiberApp(),
-		TestUserID:      "test-user-123",
+		t:                t,
+		DBService:        dbService,
+		CategoryService:  categoryService,
+		CompanyService:   companyService,
+		ReceiverService:  receiverService,
+		InvoiceService:   invoiceService,
+		UploadService:    uploadService,
+		AnalyticsService: analyticsService,
+		APIServer:        apiServer,
+		App:              apiServer.GetFiberApp(),
+		TestUserID:       "test-user-123",
 	}
 
 	return setup
@@ -227,11 +235,11 @@ func (s *TestSetup) CreateTestCompany(name string) (uint, error) {
 }
 
 // CreateTestInvoice creates a test invoice
+// Note: amount is not set - it's calculated from invoice items
 func (s *TestSetup) CreateTestInvoice(title string, categoryID, companyID *uint) (uint, error) {
 	invoice := map[string]interface{}{
 		"title":       title,
 		"description": "Test invoice",
-		"amount":      100.50,
 		"currency":    "USD",
 		"status":      "unpaid",
 	}
@@ -265,6 +273,29 @@ func (s *TestSetup) CreateTestInvoiceItem(invoiceID uint, description string, qu
 	}
 
 	resp, err := s.MakeRequest("POST", "/api/invoices/"+uintToStringHelper(invoiceID)+"/items", item)
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := s.ReadResponseBody(resp)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint(result["id"].(float64)), nil
+}
+
+// CreateTestReceiver creates a test receiver
+func (s *TestSetup) CreateTestReceiver(name string, isOrganization bool) (uint, error) {
+	receiver := &struct {
+		Name           string `json:"name"`
+		IsOrganization bool   `json:"is_organization"`
+	}{
+		Name:           name,
+		IsOrganization: isOrganization,
+	}
+
+	resp, err := s.MakeRequest("POST", "/api/receivers", receiver)
 	if err != nil {
 		return 0, err
 	}

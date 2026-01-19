@@ -3,6 +3,7 @@ import NextAuth from "next-auth";
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
+    error?: string;
     user: {
       id: string;
       name?: string | null;
@@ -27,22 +28,68 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       authorization: {
         params: {
-          scope: "openid email profile",
+          scope: "openid email profile offline_access",
         },
       },
     },
   ],
   callbacks: {
     async jwt({ token, account }) {
-      // Persist the access token from the OAuth provider
+      // Initial login - store all tokens
       if (account) {
-        token.accessToken = account.access_token;
+        return {
+          ...token,
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          expiresAt: account.expires_at,
+        };
       }
-      return token;
+
+      // Token still valid - return as is
+      if (token.expiresAt && Date.now() < (token.expiresAt as number) * 1000) {
+        return token;
+      }
+
+      // Token expired - attempt refresh
+      if (!token.refreshToken) {
+        console.error("No refresh token available", token);
+        return { ...token, error: "RefreshTokenError" };
+      }
+
+      try {
+        const response = await fetch(
+          `${process.env.AUTH_ISSUER}/api/oauth/token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              grant_type: "refresh_token",
+              refresh_token: token.refreshToken as string,
+              client_id: process.env.AUTH_CLIENT_ID!,
+              client_secret: process.env.AUTH_CLIENT_SECRET!,
+            }),
+          }
+        );
+
+        const tokens = await response.json();
+        if (!response.ok) throw tokens;
+
+        return {
+          ...token,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token ?? token.refreshToken,
+          expiresAt: Math.floor(Date.now() / 1000) + tokens.expires_in,
+          error: undefined,
+        };
+      } catch (error) {
+        console.error("Token refresh failed:", error);
+        return { ...token, error: "RefreshTokenError" };
+      }
     },
     async session({ session, token }) {
       // Make access token available to the client
       session.accessToken = token.accessToken as string | undefined;
+      session.error = token.error as string | undefined;
       return session;
     },
   },

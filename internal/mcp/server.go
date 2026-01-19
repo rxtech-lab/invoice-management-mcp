@@ -22,13 +22,14 @@ func NewMCPServer(
 	dbService services.DBService,
 	categoryService services.CategoryService,
 	companyService services.CompanyService,
+	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 ) *MCPServer {
 	mcpServer := &MCPServer{
 		dbService: dbService,
 	}
-	mcpServer.initializeTools(categoryService, companyService, invoiceService, uploadService)
+	mcpServer.initializeTools(categoryService, companyService, receiverService, invoiceService, uploadService)
 	return mcpServer
 }
 
@@ -36,6 +37,7 @@ func NewMCPServer(
 func (s *MCPServer) initializeTools(
 	categoryService services.CategoryService,
 	companyService services.CompanyService,
+	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 ) {
@@ -103,6 +105,22 @@ func (s *MCPServer) initializeTools(
 
 	deleteCompanyTool := tools.NewDeleteCompanyTool(companyService)
 	srv.AddTool(deleteCompanyTool.GetTool(), deleteCompanyTool.GetHandler())
+
+	// Receiver Tools
+	createReceiverTool := tools.NewCreateReceiverTool(receiverService)
+	srv.AddTool(createReceiverTool.GetTool(), createReceiverTool.GetHandler())
+
+	listReceiversTool := tools.NewListReceiversTool(receiverService)
+	srv.AddTool(listReceiversTool.GetTool(), listReceiversTool.GetHandler())
+
+	getReceiverTool := tools.NewGetReceiverTool(receiverService)
+	srv.AddTool(getReceiverTool.GetTool(), getReceiverTool.GetHandler())
+
+	updateReceiverTool := tools.NewUpdateReceiverTool(receiverService)
+	srv.AddTool(updateReceiverTool.GetTool(), updateReceiverTool.GetHandler())
+
+	deleteReceiverTool := tools.NewDeleteReceiverTool(receiverService)
+	srv.AddTool(deleteReceiverTool.GetTool(), deleteReceiverTool.GetHandler())
 
 	// Invoice Tools
 	createInvoiceTool := tools.NewCreateInvoiceTool(invoiceService)
@@ -201,6 +219,24 @@ func getToolInstructions(category string) string {
 5. delete_company - Delete a company
    Parameters: company_id (required)`
 
+	case "receiver":
+		return `Receiver Management Tools:
+
+1. create_receiver - Create a new invoice receiver
+   Parameters: name (required), is_organization (boolean, default false)
+
+2. list_receivers - List all receivers with optional search
+   Parameters: keyword, limit, offset
+
+3. get_receiver - Get a receiver by ID
+   Parameters: receiver_id (required)
+
+4. update_receiver - Update an existing receiver
+   Parameters: receiver_id (required), name, is_organization
+
+5. delete_receiver - Delete a receiver
+   Parameters: receiver_id (required)`
+
 	case "invoice":
 		return `Invoice Management Tools:
 
@@ -250,7 +286,7 @@ Invoice Item Tools:
 	case "all":
 		return `Invoice Management MCP Tools Overview:
 
-This MCP server provides tools for managing invoices, categories, companies, and file uploads.
+This MCP server provides tools for managing invoices, categories, companies, receivers, and file uploads.
 
 CATEGORY MANAGEMENT (5 tools):
 - create_category: Create a new category
@@ -265,6 +301,13 @@ COMPANY MANAGEMENT (5 tools):
 - get_company: Get company details
 - update_company: Update a company
 - delete_company: Delete a company
+
+RECEIVER MANAGEMENT (5 tools):
+- create_receiver: Create a new receiver
+- list_receivers: List receivers with search
+- get_receiver: Get receiver details
+- update_receiver: Update a receiver
+- delete_receiver: Delete a receiver
 
 INVOICE MANAGEMENT (10 tools):
 - create_invoice: Create a new invoice with items
@@ -284,7 +327,7 @@ FILE UPLOAD (1 tool):
 All tools require authentication. Invoices are user-scoped.`
 
 	default:
-		return `Invalid category. Available categories: category, company, invoice, upload, all`
+		return `Invalid category. Available categories: category, company, receiver, invoice, upload, all`
 	}
 }
 

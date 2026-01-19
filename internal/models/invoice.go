@@ -74,6 +74,8 @@ type Invoice struct {
 	Category   *InvoiceCategory `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	CompanyID  *uint            `gorm:"index" json:"company_id"`
 	Company    *InvoiceCompany  `gorm:"foreignKey:CompanyID" json:"company,omitempty"`
+	ReceiverID *uint            `gorm:"index" json:"receiver_id"`
+	Receiver   *InvoiceReceiver `gorm:"foreignKey:ReceiverID" json:"receiver,omitempty"`
 
 	// Items (one-to-many)
 	Items []InvoiceItem `gorm:"foreignKey:InvoiceID" json:"items,omitempty"`

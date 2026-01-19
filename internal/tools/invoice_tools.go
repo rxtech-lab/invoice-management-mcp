@@ -23,17 +23,17 @@ func NewCreateInvoiceTool(service services.InvoiceService) *CreateInvoiceTool {
 
 func (t *CreateInvoiceTool) GetTool() mcp.Tool {
 	return mcp.NewTool("create_invoice",
-		mcp.WithDescription("Create a new invoice"),
+		mcp.WithDescription("Create a new invoice. Note: amount is calculated from invoice items, use add_invoice_item to add items."),
 		mcp.WithString("title", mcp.Required(), mcp.Description("Invoice title")),
 		mcp.WithString("description", mcp.Description("Invoice description")),
-		mcp.WithNumber("amount", mcp.Description("Total amount")),
+		mcp.WithNumber("receiver_id", mcp.Description("Receiver ID")),
 		mcp.WithString("currency", mcp.Description("Currency code (default: USD)")),
 		mcp.WithNumber("category_id", mcp.Description("Category ID")),
 		mcp.WithNumber("company_id", mcp.Description("Company ID")),
 		mcp.WithString("invoice_started_at", mcp.Description("Billing cycle start (RFC3339)")),
 		mcp.WithString("invoice_ended_at", mcp.Description("Billing cycle end (RFC3339)")),
 		mcp.WithString("original_download_link", mcp.Description("Link to original invoice file")),
-		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue (default: unpaid)")),
+		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue (default: paid). Please justify the status base on the pdf file and the invoice items.")),
 		mcp.WithString("due_date", mcp.Description("Due date (RFC3339)")),
 	)
 }
@@ -48,7 +48,6 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 		args := getArgsMap(request.Params.Arguments)
 		title, _ := args["title"].(string)
 		description, _ := args["description"].(string)
-		amount := getFloatArg(args, "amount", 0)
 		currency, _ := args["currency"].(string)
 		if currency == "" {
 			currency = "USD"
@@ -56,10 +55,11 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 
 		categoryID := getUintPtrArg(args, "category_id")
 		companyID := getUintPtrArg(args, "company_id")
+		receiverID := getUintPtrArg(args, "receiver_id")
 		originalDownloadLink, _ := args["original_download_link"].(string)
 
 		statusStr, _ := args["status"].(string)
-		status := models.InvoiceStatusUnpaid
+		status := models.InvoiceStatusPaid
 		if statusStr != "" {
 			status = models.InvoiceStatus(statusStr)
 		}
@@ -68,10 +68,11 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 		invoiceEndedAt := parseTimeArg(args, "invoice_ended_at")
 		dueDate := parseTimeArg(args, "due_date")
 
+		// Note: Amount is not set here - it's calculated from invoice items
 		invoice := &models.Invoice{
 			Title:                title,
 			Description:          description,
-			Amount:               amount,
+			ReceiverID:           receiverID,
 			Currency:             currency,
 			CategoryID:           categoryID,
 			CompanyID:            companyID,
@@ -107,6 +108,7 @@ func (t *ListInvoicesTool) GetTool() mcp.Tool {
 		mcp.WithString("keyword", mcp.Description("Search keyword")),
 		mcp.WithNumber("category_id", mcp.Description("Filter by category ID")),
 		mcp.WithNumber("company_id", mcp.Description("Filter by company ID")),
+		mcp.WithNumber("receiver_id", mcp.Description("Filter by receiver ID")),
 		mcp.WithString("status", mcp.Description("Filter by status: paid, unpaid, overdue")),
 		mcp.WithString("sort_by", mcp.Description("Sort by: created_at, amount, due_date, title")),
 		mcp.WithString("sort_order", mcp.Description("Sort order: asc, desc")),
@@ -136,6 +138,9 @@ func (t *ListInvoicesTool) GetHandler() server.ToolHandlerFunc {
 		}
 		if companyID := getUintPtrArg(args, "company_id"); companyID != nil {
 			opts.CompanyID = companyID
+		}
+		if receiverID := getUintPtrArg(args, "receiver_id"); receiverID != nil {
+			opts.ReceiverID = receiverID
 		}
 		if statusStr := getStringArg(args, "status"); statusStr != "" {
 			status := models.InvoiceStatus(statusStr)
@@ -207,11 +212,11 @@ func NewUpdateInvoiceTool(service services.InvoiceService) *UpdateInvoiceTool {
 
 func (t *UpdateInvoiceTool) GetTool() mcp.Tool {
 	return mcp.NewTool("update_invoice",
-		mcp.WithDescription("Update an existing invoice"),
+		mcp.WithDescription("Update an existing invoice. Note: amount is calculated from invoice items and cannot be set directly."),
 		mcp.WithNumber("invoice_id", mcp.Required(), mcp.Description("Invoice ID")),
 		mcp.WithString("title", mcp.Description("Invoice title")),
 		mcp.WithString("description", mcp.Description("Invoice description")),
-		mcp.WithNumber("amount", mcp.Description("Total amount")),
+		mcp.WithNumber("receiver_id", mcp.Description("Receiver ID")),
 		mcp.WithString("currency", mcp.Description("Currency code")),
 		mcp.WithNumber("category_id", mcp.Description("Category ID")),
 		mcp.WithNumber("company_id", mcp.Description("Company ID")),
@@ -236,7 +241,6 @@ func (t *UpdateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 
 		title, _ := args["title"].(string)
 		description, _ := args["description"].(string)
-		amount := getFloatArg(args, "amount", 0)
 		currency, _ := args["currency"].(string)
 		originalDownloadLink, _ := args["original_download_link"].(string)
 
@@ -245,11 +249,12 @@ func (t *UpdateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 
 		dueDate := parseTimeArg(args, "due_date")
 
+		// Note: Amount is not set here - it's calculated from invoice items
 		invoice := &models.Invoice{
 			ID:                   invoiceID,
 			Title:                title,
 			Description:          description,
-			Amount:               amount,
+			ReceiverID:           getUintPtrArg(args, "receiver_id"),
 			Currency:             currency,
 			CategoryID:           getUintPtrArg(args, "category_id"),
 			CompanyID:            getUintPtrArg(args, "company_id"),

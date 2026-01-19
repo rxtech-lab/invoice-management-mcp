@@ -26,8 +26,10 @@ type APIServer struct {
 	dbService              services.DBService
 	categoryService        services.CategoryService
 	companyService         services.CompanyService
+	receiverService        services.ReceiverService
 	invoiceService         services.InvoiceService
 	uploadService          services.UploadService
+	analyticsService       services.AnalyticsService
 	mcpServer              *mcpserver.MCPServer
 	mcprouterAuthenticator *auth.ApikeyAuthenticator
 	oauthAuthenticator     *middleware.OAuthAuthenticator
@@ -40,8 +42,10 @@ func NewAPIServer(
 	dbService services.DBService,
 	categoryService services.CategoryService,
 	companyService services.CompanyService,
+	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
+	analyticsService services.AnalyticsService,
 	mcpServer *mcpserver.MCPServer,
 ) *APIServer {
 	app := fiber.New(fiber.Config{
@@ -91,8 +95,10 @@ func NewAPIServer(
 		dbService:              dbService,
 		categoryService:        categoryService,
 		companyService:         companyService,
+		receiverService:        receiverService,
 		invoiceService:         invoiceService,
 		uploadService:          uploadService,
+		analyticsService:       analyticsService,
 		mcpServer:              mcpServer,
 		mcprouterAuthenticator: mcprouterAuthenticator,
 		oauthAuthenticator:     oauthAuthenticator,
@@ -146,6 +152,13 @@ func (s *APIServer) SetupRoutes() {
 	api.Put("/companies/:id", s.handleUpdateCompany)
 	api.Delete("/companies/:id", s.handleDeleteCompany)
 
+	// Receiver routes
+	api.Post("/receivers", s.handleCreateReceiver)
+	api.Get("/receivers", s.handleListReceivers)
+	api.Get("/receivers/:id", s.handleGetReceiver)
+	api.Put("/receivers/:id", s.handleUpdateReceiver)
+	api.Delete("/receivers/:id", s.handleDeleteReceiver)
+
 	// Invoice routes
 	api.Post("/invoices", s.handleCreateInvoice)
 	api.Get("/invoices", s.handleListInvoices)
@@ -162,6 +175,12 @@ func (s *APIServer) SetupRoutes() {
 	// Upload routes
 	api.Post("/upload", s.handleUploadFile)
 	api.Get("/upload/presigned", s.handleGetPresignedURL)
+
+	// Analytics routes
+	api.Get("/analytics/summary", s.handleGetAnalyticsSummary)
+	api.Get("/analytics/by-category", s.handleGetAnalyticsByCategory)
+	api.Get("/analytics/by-company", s.handleGetAnalyticsByCompany)
+	api.Get("/analytics/by-receiver", s.handleGetAnalyticsByReceiver)
 }
 
 // EnableAuthentication enables authentication middleware (OAuth and/or MCPRouter)

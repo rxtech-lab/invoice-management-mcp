@@ -112,6 +112,7 @@ func (s *dbService) migrate() error {
 	return s.db.AutoMigrate(
 		&models.InvoiceCategory{},
 		&models.InvoiceCompany{},
+		&models.InvoiceReceiver{},
 		&models.Invoice{},
 		&models.InvoiceItem{},
 	)

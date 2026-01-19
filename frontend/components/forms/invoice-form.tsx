@@ -15,20 +15,21 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Category, Company, Invoice, InvoiceStatus } from "@/lib/api/types";
+import { Category, Company, Receiver, Invoice, InvoiceStatus } from "@/lib/api/types";
 import { createInvoiceAction, updateInvoiceAction } from "@/lib/actions/invoice-actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 
+// Note: amount is not in the schema - it's calculated from invoice items
 const invoiceSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  amount: z.coerce.number().min(0, "Amount must be positive"),
   currency: z.string().min(1),
   category_id: z.coerce.number().optional().nullable(),
   company_id: z.coerce.number().optional().nullable(),
+  receiver_id: z.coerce.number().optional().nullable(),
   status: z.enum(["paid", "unpaid", "overdue"]),
   due_date: z.string().optional().nullable(),
   invoice_started_at: z.string().optional().nullable(),
@@ -42,9 +43,10 @@ interface InvoiceFormProps {
   invoice?: Invoice;
   categories: Category[];
   companies: Company[];
+  receivers: Receiver[];
 }
 
-export function InvoiceForm({ invoice, categories, companies }: InvoiceFormProps) {
+export function InvoiceForm({ invoice, categories, companies, receivers }: InvoiceFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!invoice;
@@ -60,10 +62,10 @@ export function InvoiceForm({ invoice, categories, companies }: InvoiceFormProps
     defaultValues: {
       title: invoice?.title || "",
       description: invoice?.description || "",
-      amount: invoice?.amount || 0,
       currency: invoice?.currency || "USD",
       category_id: invoice?.category_id || null,
       company_id: invoice?.company_id || null,
+      receiver_id: invoice?.receiver_id || null,
       status: invoice?.status || "unpaid",
       due_date: invoice?.due_date?.split("T")[0] || "",
       invoice_started_at: invoice?.invoice_started_at?.split("T")[0] || "",
@@ -75,14 +77,15 @@ export function InvoiceForm({ invoice, categories, companies }: InvoiceFormProps
   const onSubmit = async (data: InvoiceFormData) => {
     setIsSubmitting(true);
     try {
+      // Note: amount is not included - it's calculated from invoice items
       const payload = {
         title: data.title,
         description: data.description || undefined,
-        amount: data.amount,
         currency: data.currency,
         status: data.status,
         category_id: data.category_id || undefined,
         company_id: data.company_id || undefined,
+        receiver_id: data.receiver_id || undefined,
         due_date: data.due_date ? new Date(data.due_date).toISOString() : undefined,
         invoice_started_at: data.invoice_started_at
           ? new Date(data.invoice_started_at).toISOString()
@@ -135,24 +138,10 @@ export function InvoiceForm({ invoice, categories, companies }: InvoiceFormProps
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount *</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                {...register("amount")}
-                placeholder="0.00"
-              />
-              {errors.amount && (
-                <p className="text-sm text-destructive">{errors.amount.message}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Input id="currency" {...register("currency")} placeholder="USD" />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency</Label>
+            <Input id="currency" {...register("currency")} placeholder="USD" className="max-w-xs" />
+            <p className="text-sm text-muted-foreground">Amount is calculated from invoice items</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -202,6 +191,30 @@ export function InvoiceForm({ invoice, categories, companies }: InvoiceFormProps
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label>Receiver</Label>
+            <Select
+              value={watch("receiver_id")?.toString() || ""}
+              onValueChange={(v) => setValue("receiver_id", v ? Number(v) : null)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select receiver" />
+              </SelectTrigger>
+              <SelectContent>
+                {receivers.map((rec) => (
+                  <SelectItem key={rec.id} value={rec.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      {rec.name}
+                      {rec.is_organization && (
+                        <span className="text-xs text-muted-foreground">(Org)</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Status</Label>
@@ -246,12 +259,31 @@ export function InvoiceForm({ invoice, categories, companies }: InvoiceFormProps
 
           <div className="space-y-2">
             <Label htmlFor="original_download_link">Original File URL</Label>
-            <Input
-              id="original_download_link"
-              type="url"
-              {...register("original_download_link")}
-              placeholder="https://..."
-            />
+            <div className="flex gap-2">
+              <Input
+                id="original_download_link"
+                type="url"
+                {...register("original_download_link")}
+                placeholder="https://..."
+              />
+              {watch("original_download_link") && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  asChild
+                >
+                  <a
+                    href={watch("original_download_link") || ""}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-4">

@@ -19,8 +19,11 @@ import {
   deleteInvoiceItemAction,
 } from "@/lib/actions/invoice-item-actions";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/utils";
 import { Loader2, Plus, Pencil, Trash, Check, X } from "lucide-react";
+import { CurrencyPicker } from "@/components/currency/currency-picker";
+import { ConvertedAmount } from "@/components/currency/converted-amount";
+import { useExchangeRate } from "@/hooks/use-exchange-rate";
+import type { CurrencyCode } from "@/lib/currency";
 
 interface InvoiceItemsTableProps {
   invoiceId: number;
@@ -54,6 +57,14 @@ export function InvoiceItemsTable({
     description: "",
     quantity: 1,
     unit_price: 0,
+  });
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode | null>(
+    null
+  );
+
+  const { rate, isLoading: rateLoading, convert } = useExchangeRate({
+    fromCurrency: currency,
+    toCurrency: displayCurrency,
   });
 
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
@@ -136,14 +147,22 @@ export function InvoiceItemsTable({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Invoice Items</CardTitle>
-        <Button
-          size="sm"
-          onClick={() => setIsAdding(true)}
-          disabled={isAdding}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Item
-        </Button>
+        <div className="flex items-center gap-4">
+          <CurrencyPicker
+            value={displayCurrency}
+            onChange={setDisplayCurrency}
+            originalCurrency={currency}
+            isLoading={rateLoading}
+          />
+          <Button
+            size="sm"
+            onClick={() => setIsAdding(true)}
+            disabled={isAdding}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
@@ -199,10 +218,16 @@ export function InvoiceItemsTable({
                       />
                     </TableCell>
                     <TableCell className="font-medium">
-                      {formatCurrency(
-                        editItem.quantity * editItem.unit_price,
-                        currency
-                      )}
+                      <ConvertedAmount
+                        originalAmount={editItem.quantity * editItem.unit_price}
+                        originalCurrency={currency}
+                        convertedAmount={
+                          rate
+                            ? convert(editItem.quantity * editItem.unit_price)
+                            : null
+                        }
+                        displayCurrency={displayCurrency}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -232,9 +257,22 @@ export function InvoiceItemsTable({
                   <>
                     <TableCell>{item.description}</TableCell>
                     <TableCell>{item.quantity}</TableCell>
-                    <TableCell>{formatCurrency(item.unit_price, currency)}</TableCell>
+                    <TableCell>
+                      <ConvertedAmount
+                        originalAmount={item.unit_price}
+                        originalCurrency={currency}
+                        convertedAmount={rate ? convert(item.unit_price) : null}
+                        displayCurrency={displayCurrency}
+                        showOriginal={false}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
-                      {formatCurrency(item.amount, currency)}
+                      <ConvertedAmount
+                        originalAmount={item.amount}
+                        originalCurrency={currency}
+                        convertedAmount={rate ? convert(item.amount) : null}
+                        displayCurrency={displayCurrency}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -305,7 +343,16 @@ export function InvoiceItemsTable({
                   />
                 </TableCell>
                 <TableCell className="font-medium">
-                  {formatCurrency(newItem.quantity * newItem.unit_price, currency)}
+                  <ConvertedAmount
+                    originalAmount={newItem.quantity * newItem.unit_price}
+                    originalCurrency={currency}
+                    convertedAmount={
+                      rate
+                        ? convert(newItem.quantity * newItem.unit_price)
+                        : null
+                    }
+                    displayCurrency={displayCurrency}
+                  />
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
@@ -352,7 +399,13 @@ export function InvoiceItemsTable({
         {items.length > 0 && (
           <div className="mt-4 flex justify-end border-t pt-4">
             <div className="text-lg font-semibold">
-              Total: {formatCurrency(totalAmount, currency)}
+              Total:{" "}
+              <ConvertedAmount
+                originalAmount={totalAmount}
+                originalCurrency={currency}
+                convertedAmount={rate ? convert(totalAmount) : null}
+                displayCurrency={displayCurrency}
+              />
             </div>
           </div>
         )}
