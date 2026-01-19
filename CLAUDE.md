@@ -289,3 +289,288 @@ func (t *CreateCategoryTool) GetHandler() server.ToolHandlerFunc {
 - `github.com/aws/aws-sdk-go-v2` - S3-compatible storage
 - `github.com/rxtech-lab/mcprouter-authenticator` - MCPRouter authentication
 - `github.com/stretchr/testify` - Testing utilities
+
+---
+
+# Frontend
+
+Next.js admin dashboard for the Invoice Management API.
+
+## Frontend Architecture
+
+- **Framework**: Next.js 16 (App Router) with Server Components
+- **UI**: shadcn/ui (radix-vega style) + Tailwind CSS 4
+- **Data Fetching**: Server-side rendering with `fetch` (no client-side data fetching)
+- **Mutations**: Server Actions with `revalidatePath` for cache invalidation
+- **Auth**: Auth.js v5 with OAuth 2.0 (OIDC) to auth.rxlab.app
+- **Forms**: React Hook Form + Zod validation
+- **Tables**: TanStack Table (client component for interactivity)
+- **Charts**: Recharts
+- **Package Manager**: Bun
+
+## Frontend File Structure
+
+```
+frontend/
+├── app/
+│   ├── (auth)/
+│   │   ├── login/page.tsx           # OAuth login page
+│   │   └── layout.tsx               # Minimal auth layout
+│   ├── (dashboard)/
+│   │   ├── layout.tsx               # Dashboard layout with sidebar
+│   │   ├── dashboard/page.tsx       # Dashboard overview
+│   │   ├── invoices/
+│   │   │   ├── page.tsx             # Invoice list
+│   │   │   ├── new/page.tsx         # Create invoice
+│   │   │   └── [id]/page.tsx        # Invoice detail/edit with items
+│   │   ├── companies/
+│   │   │   ├── page.tsx             # Company list
+│   │   │   ├── new/page.tsx         # Create company
+│   │   │   └── [id]/page.tsx        # Edit company
+│   │   └── categories/
+│   │       ├── page.tsx             # Category list
+│   │       ├── new/page.tsx         # Create category
+│   │       └── [id]/page.tsx        # Edit category
+│   ├── api/auth/[...nextauth]/route.ts  # Auth.js API route
+│   ├── providers.tsx                # Session provider
+│   ├── page.tsx                     # Root redirect to /dashboard
+│   └── layout.tsx                   # Root layout
+├── auth.ts                          # Auth.js configuration
+├── middleware.ts                    # Route protection
+├── components/
+│   ├── ui/                          # shadcn components
+│   ├── layout/
+│   │   ├── app-sidebar.tsx          # Main navigation sidebar
+│   │   ├── site-header.tsx          # Header with breadcrumbs
+│   │   └── nav-user.tsx             # User menu with sign out
+│   ├── dashboard/
+│   │   ├── section-cards.tsx        # Metrics cards
+│   │   └── chart-area-interactive.tsx  # Invoice trends chart
+│   ├── data-table/
+│   │   ├── data-table.tsx           # Reusable table component
+│   │   └── columns/
+│   │       ├── invoice-columns.tsx
+│   │       ├── company-columns.tsx
+│   │       └── category-columns.tsx
+│   └── forms/
+│       ├── invoice-form.tsx
+│       ├── invoice-items-table.tsx  # Inline items editing
+│       ├── company-form.tsx
+│       └── category-form.tsx
+├── lib/
+│   ├── api/
+│   │   ├── client.ts                # Server-side fetch wrapper with auth
+│   │   ├── types.ts                 # TypeScript interfaces
+│   │   ├── invoices.ts              # Invoice API functions
+│   │   ├── invoice-items.ts
+│   │   ├── categories.ts
+│   │   ├── companies.ts
+│   │   └── upload.ts
+│   ├── actions/
+│   │   ├── invoice-actions.ts       # Server Actions for invoices
+│   │   ├── invoice-item-actions.ts
+│   │   ├── company-actions.ts
+│   │   ├── category-actions.ts
+│   │   └── upload-actions.ts
+│   └── utils.ts                     # Utility functions
+└── .env.local                       # Environment variables
+```
+
+## Frontend Development Commands
+
+```bash
+cd frontend
+
+# Install dependencies
+bun install
+
+# Development server
+bun dev
+
+# Build for production
+bun run build
+
+# Start production server
+bun start
+
+# Add shadcn components
+bunx shadcn@latest add <component-name>
+```
+
+## Frontend Environment Variables
+
+```bash
+# Auth.js Configuration
+# Generate with: openssl rand -base64 32
+AUTH_SECRET=your-auth-secret-here
+
+# OAuth Provider (auth.rxlab.app)
+# Callback URL: http://localhost:3000/api/auth/callback/rxlab
+AUTH_ISSUER=https://auth.rxlab.app
+AUTH_CLIENT_ID=your-client-id
+AUTH_CLIENT_SECRET=your-client-secret
+
+# Backend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
+
+## Frontend Authentication
+
+Auth.js v5 with OIDC provider configuration:
+
+```typescript
+// auth.ts
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  providers: [
+    {
+      id: "rxlab",
+      name: "RxLab",
+      type: "oidc",
+      issuer: process.env.AUTH_ISSUER,
+      clientId: process.env.AUTH_CLIENT_ID!,
+      clientSecret: process.env.AUTH_CLIENT_SECRET!,
+      client: {
+        token_endpoint_auth_method: "client_secret_post",
+      },
+      authorization: {
+        params: {
+          scope: "openid email profile",
+        },
+      },
+    },
+  ],
+  callbacks: {
+    async jwt({ token, account }) {
+      if (account) {
+        token.accessToken = account.access_token;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      session.accessToken = token.accessToken;
+      return session;
+    },
+  },
+  pages: {
+    signIn: "/login",
+  },
+});
+```
+
+### OAuth Callback URL
+
+Configure in your OAuth provider:
+- **Development**: `http://localhost:3000/api/auth/callback/rxlab`
+- **Production**: `https://your-domain.com/api/auth/callback/rxlab`
+
+## Frontend Patterns
+
+### Server-Side Data Fetching
+
+All data fetching happens on the server using the API client:
+
+```typescript
+// lib/api/client.ts
+import { auth } from "@/auth";
+
+export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const session = await auth();
+  const headers: HeadersInit = { "Content-Type": "application/json", ...options.headers };
+
+  if (session?.accessToken) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${session.accessToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+```
+
+### Server Actions for Mutations
+
+All mutations use Server Actions with path revalidation:
+
+```typescript
+// lib/actions/category-actions.ts
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { apiClient } from "@/lib/api/client";
+
+export async function createCategoryAction(data: CreateCategoryRequest) {
+  try {
+    const category = await apiClient<Category>("/api/categories", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    revalidatePath("/categories");
+    return { success: true, data: category };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create" };
+  }
+}
+```
+
+### Protected Routes
+
+Middleware redirects unauthenticated users to login:
+
+```typescript
+// middleware.ts
+import { auth } from "@/auth";
+import { NextResponse } from "next/server";
+
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const isAuthPage = req.nextUrl.pathname.startsWith("/login");
+
+  if (isAuthPage && isLoggedIn) {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  }
+
+  if (!isAuthPage && !isLoggedIn) {
+    return NextResponse.redirect(new URL("/login", req.nextUrl));
+  }
+});
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
+```
+
+## Frontend Routes
+
+| Route | Description |
+|-------|-------------|
+| `/` | Redirects to `/dashboard` |
+| `/login` | OAuth login page |
+| `/dashboard` | Dashboard with metrics and charts |
+| `/invoices` | Invoice list with filters |
+| `/invoices/new` | Create new invoice |
+| `/invoices/[id]` | Edit invoice with inline items table |
+| `/companies` | Company list |
+| `/companies/new` | Create new company |
+| `/companies/[id]` | Edit company |
+| `/categories` | Category list |
+| `/categories/new` | Create new category |
+| `/categories/[id]` | Edit category |
+
+## Frontend Key Dependencies
+
+- `next-auth@beta` - Auth.js v5 for authentication
+- `@tanstack/react-table` - Data tables
+- `recharts` - Charts and visualizations
+- `react-hook-form` - Form state management
+- `@hookform/resolvers` - Zod resolver for forms
+- `zod` - Schema validation
+- `date-fns` - Date formatting
+- `lucide-react` - Icons
