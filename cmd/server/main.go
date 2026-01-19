@@ -35,6 +35,7 @@ func main() {
 	receiverService := services.NewReceiverService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := initUploadService()
+	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
 
 	// Initialize MCP server
@@ -56,6 +57,7 @@ func main() {
 		receiverService,
 		invoiceService,
 		uploadService,
+		fileUploadService,
 		analyticsService,
 		mcpSrv.GetServer(),
 	)

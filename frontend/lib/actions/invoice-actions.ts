@@ -14,6 +14,7 @@ import type {
   InvoiceStatus,
 } from "@/lib/api/types";
 import { invoiceAgentPrompt } from "../prompt";
+import { getFileDownloadURLAction } from "./upload-actions";
 
 export type ToolProgress = {
   status: 'idle' | 'calling' | 'complete' | 'error';
@@ -124,7 +125,7 @@ function formatToolName(toolName: string): string {
   return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export async function createInvoiceWithAgentAction(fileUrl: string) {
+export async function createInvoiceWithAgentAction(fileKey: string) {
   const session = await auth();
 
   if (!session?.accessToken) {
@@ -144,6 +145,23 @@ export async function createInvoiceWithAgentAction(fileUrl: string) {
   // Run async to allow returning stream immediately
   (async () => {
     try {
+      // Fetch download URL from file key
+      progressStream.update({
+        status: 'calling',
+        message: 'Fetching file URL...',
+      });
+
+      const downloadResult = await getFileDownloadURLAction(fileKey);
+      if (!downloadResult.success || !downloadResult.data) {
+        progressStream.done({
+          status: 'error',
+          message: downloadResult.error || 'Failed to get file download URL',
+        });
+        return;
+      }
+
+      const fileUrl = downloadResult.data.download_url;
+
       const url = process.env.NEXT_PUBLIC_API_URL! + "/mcp";
 
       const httpClient = await createMCPClient({
@@ -172,7 +190,7 @@ export async function createInvoiceWithAgentAction(fileUrl: string) {
             content: [
               {
                 type: 'text',
-                text: `Create an invoice for the following file, make sure to use tools to add the invoice to the database. The original download link is ${fileUrl}, make sure add this link to the invoice`,
+                text: `Create an invoice for the following file, make sure to use tools to add the invoice to the database. The original_download_link should be set to "${fileKey}" (this is the file key, not a URL)`,
               },
               {
                 type: 'file',

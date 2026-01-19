@@ -168,7 +168,6 @@ export interface UpdateStatusRequest {
 // Upload
 export interface UploadResponse {
   key: string;
-  download_url: string;
   filename: string;
   size: number;
   content_type: string;
@@ -178,6 +177,13 @@ export interface PresignedURLResponse {
   upload_url: string;
   key: string;
   content_type: string;
+}
+
+export interface FileDownloadURLResponse {
+  download_url: string;
+  key: string;
+  filename: string;
+  expires_at: string;
 }
 
 // Paginated Response

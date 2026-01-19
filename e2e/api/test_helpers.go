@@ -46,6 +46,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	receiverService := services.NewReceiverService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := services.NewMockUploadService()
+	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
 
 	// Create API server
@@ -56,6 +57,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 		receiverService,
 		invoiceService,
 		uploadService,
+		fileUploadService,
 		analyticsService,
 		nil, // No MCP server for tests
 	)

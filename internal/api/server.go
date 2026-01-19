@@ -6,12 +6,15 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/invoice-management/internal/api/generated"
+	"github.com/rxtech-lab/invoice-management/internal/api/handlers"
 	"github.com/rxtech-lab/invoice-management/internal/api/middleware"
 	"github.com/rxtech-lab/invoice-management/internal/assets"
 	"github.com/rxtech-lab/invoice-management/internal/services"
@@ -29,6 +32,7 @@ type APIServer struct {
 	receiverService        services.ReceiverService
 	invoiceService         services.InvoiceService
 	uploadService          services.UploadService
+	fileUploadService      services.FileUploadService
 	analyticsService       services.AnalyticsService
 	mcpServer              *mcpserver.MCPServer
 	mcprouterAuthenticator *auth.ApikeyAuthenticator
@@ -45,11 +49,26 @@ func NewAPIServer(
 	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
+	fileUploadService services.FileUploadService,
 	analyticsService services.AnalyticsService,
 	mcpServer *mcpserver.MCPServer,
 ) *APIServer {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
+		// Custom error handler to properly handle errors from generated code
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			// Check if it's already a Fiber error
+			if e, ok := err.(*fiber.Error); ok {
+				return c.Status(e.Code).JSON(fiber.Map{"error": e.Message})
+			}
+			// For other errors (like from generated code), return 400 for validation errors
+			errMsg := err.Error()
+			if strings.HasPrefix(errMsg, "Query argument") || strings.HasPrefix(errMsg, "Path argument") {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": errMsg})
+			}
+			// Default to 500 for unexpected errors
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": errMsg})
+		},
 	})
 
 	// Add middleware
@@ -98,6 +117,7 @@ func NewAPIServer(
 		receiverService:        receiverService,
 		invoiceService:         invoiceService,
 		uploadService:          uploadService,
+		fileUploadService:      fileUploadService,
 		analyticsService:       analyticsService,
 		mcpServer:              mcpServer,
 		mcprouterAuthenticator: mcprouterAuthenticator,
@@ -108,11 +128,6 @@ func NewAPIServer(
 
 // SetupRoutes configures all API routes
 func (s *APIServer) SetupRoutes() {
-	// Health check (no auth required)
-	s.app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(map[string]string{"status": "ok"})
-	})
-
 	// OpenAPI spec (no auth required)
 	s.app.Get("/openapi", func(c *fiber.Ctx) error {
 		c.Set("Content-Type", "application/yaml")
@@ -135,52 +150,46 @@ func (s *APIServer) SetupRoutes() {
 		return c.JSON(fiber.Map{"status": "ok", "user": authenticatedUser})
 	})
 
-	// API routes group
-	api := s.app.Group("/api")
+	// Create strict handlers with all services
+	strictHandlers := handlers.NewStrictHandlers(
+		s.categoryService,
+		s.companyService,
+		s.receiverService,
+		s.invoiceService,
+		s.uploadService,
+		s.fileUploadService,
+		s.analyticsService,
+	)
 
-	// Category routes
-	api.Post("/categories", s.handleCreateCategory)
-	api.Get("/categories", s.handleListCategories)
-	api.Get("/categories/:id", s.handleGetCategory)
-	api.Put("/categories/:id", s.handleUpdateCategory)
-	api.Delete("/categories/:id", s.handleDeleteCategory)
+	// Create strict handler wrapper (converts StrictServerInterface to ServerInterface)
+	strictHandler := generated.NewStrictHandler(strictHandlers, nil)
 
-	// Company routes
-	api.Post("/companies", s.handleCreateCompany)
-	api.Get("/companies", s.handleListCompanies)
-	api.Get("/companies/:id", s.handleGetCompany)
-	api.Put("/companies/:id", s.handleUpdateCompany)
-	api.Delete("/companies/:id", s.handleDeleteCompany)
+	// Register all API routes using generated handlers
+	// Middleware checks authentication and passes user to Go context
+	generated.RegisterHandlersWithOptions(s.app, strictHandler, generated.FiberServerOptions{
+		BaseURL: "",
+		Middlewares: []generated.MiddlewareFunc{
+			func(c *fiber.Ctx) error {
+				// Skip auth check for health endpoint
+				if c.Path() == "/health" {
+					return c.Next()
+				}
 
-	// Receiver routes
-	api.Post("/receivers", s.handleCreateReceiver)
-	api.Get("/receivers", s.handleListReceivers)
-	api.Get("/receivers/:id", s.handleGetReceiver)
-	api.Put("/receivers/:id", s.handleUpdateReceiver)
-	api.Delete("/receivers/:id", s.handleDeleteReceiver)
+				// Check if user is authenticated
+				user := c.Locals(middleware.AuthenticatedUserContextKey)
+				if user == nil {
+					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+						"error": "Unauthorized",
+					})
+				}
 
-	// Invoice routes
-	api.Post("/invoices", s.handleCreateInvoice)
-	api.Get("/invoices", s.handleListInvoices)
-	api.Get("/invoices/:id", s.handleGetInvoice)
-	api.Put("/invoices/:id", s.handleUpdateInvoice)
-	api.Delete("/invoices/:id", s.handleDeleteInvoice)
-	api.Patch("/invoices/:id/status", s.handleUpdateInvoiceStatus)
-
-	// Invoice item routes
-	api.Post("/invoices/:id/items", s.handleAddInvoiceItem)
-	api.Put("/invoices/:invoice_id/items/:item_id", s.handleUpdateInvoiceItem)
-	api.Delete("/invoices/:invoice_id/items/:item_id", s.handleDeleteInvoiceItem)
-
-	// Upload routes
-	api.Post("/upload", s.handleUploadFile)
-	api.Get("/upload/presigned", s.handleGetPresignedURL)
-
-	// Analytics routes
-	api.Get("/analytics/summary", s.handleGetAnalyticsSummary)
-	api.Get("/analytics/by-category", s.handleGetAnalyticsByCategory)
-	api.Get("/analytics/by-company", s.handleGetAnalyticsByCompany)
-	api.Get("/analytics/by-receiver", s.handleGetAnalyticsByReceiver)
+				// Pass authenticated user to Go context for strict handlers
+				ctx := utils.WithAuthenticatedUser(c.UserContext(), user.(*utils.AuthenticatedUser))
+				c.SetUserContext(ctx)
+				return c.Next()
+			},
+		},
+	})
 }
 
 // EnableAuthentication enables authentication middleware (OAuth and/or MCPRouter)
@@ -334,14 +343,4 @@ func (s *APIServer) createUnauthenticatedMCPHandler(streamableServer *mcpserver.
 		})
 		return adaptor.HTTPHandler(httpHandler)(c)
 	}
-}
-
-// getUserID extracts the user ID from the request context
-func (s *APIServer) getUserID(c *fiber.Ctx) (string, error) {
-	user := c.Locals(middleware.AuthenticatedUserContextKey)
-	if user == nil {
-		return "", fiber.NewError(fiber.StatusUnauthorized, "Not authenticated")
-	}
-	authenticatedUser := user.(*utils.AuthenticatedUser)
-	return authenticatedUser.Sub, nil
 }

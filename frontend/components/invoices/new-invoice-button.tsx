@@ -65,7 +65,7 @@ export function NewInvoiceButton() {
       toast.loading("Processing invoice with AI agent...", { id: toastId });
 
       const { progress } = await createInvoiceWithAgentAction(
-        uploadResult.data.download_url
+        uploadResult.data.key
       );
 
       let lastStatus: ToolProgress["status"] = "idle";
