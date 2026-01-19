@@ -11,14 +11,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash, Eye, ArrowUpDown } from "lucide-react";
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash,
+  Eye,
+  ArrowUpDown,
+} from "lucide-react";
 import { Invoice, InvoiceStatus } from "@/lib/api/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { deleteInvoiceAction, updateInvoiceStatusAction } from "@/lib/actions/invoice-actions";
+import {
+  deleteInvoiceAction,
+  updateInvoiceStatusAction,
+} from "@/lib/actions/invoice-actions";
 import { toast } from "sonner";
 
-const statusVariants: Record<InvoiceStatus, "default" | "secondary" | "destructive"> = {
+const statusVariants: Record<
+  InvoiceStatus,
+  "default" | "secondary" | "destructive"
+> = {
   paid: "default",
   unpaid: "secondary",
   overdue: "destructive",
@@ -49,7 +61,18 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
   {
     accessorKey: "company",
     header: "Company",
-    cell: ({ row }) => row.original.company?.name || "-",
+    cell: ({ row }) => {
+      const company = row.original.company;
+      if (!company) return "-";
+      return (
+        <Link
+          href={`/invoices?company_id=${company.id}`}
+          className="hover:underline"
+        >
+          {company.name}
+        </Link>
+      );
+    },
   },
   {
     accessorKey: "category",
@@ -58,7 +81,10 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
       const category = row.original.category;
       if (!category) return "-";
       return (
-        <div className="flex items-center gap-2">
+        <Link
+          href={`/invoices?category_id=${category.id}`}
+          className="flex items-center gap-2 hover:underline"
+        >
           {category.color && (
             <div
               className="h-3 w-3 rounded-full"
@@ -66,7 +92,26 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
             />
           )}
           {category.name}
-        </div>
+        </Link>
+      );
+    },
+  },
+  {
+    accessorKey: "receiver",
+    header: "Receiver",
+    cell: ({ row }) => {
+      const receiver = row.original.receiver;
+      if (!receiver) return "-";
+      return (
+        <Link
+          href={`/invoices?receiver_id=${receiver.id}`}
+          className="flex items-center gap-1 hover:underline"
+        >
+          {receiver.name}
+          {receiver.is_organization && (
+            <span className="text-xs text-muted-foreground">(Org)</span>
+          )}
+        </Link>
       );
     },
   },
@@ -91,9 +136,11 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
     cell: ({ row }) => {
       const status = row.original.status;
       return (
-        <Badge variant={statusVariants[status]}>
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </Badge>
+        <Link href={`/invoices?status=${status}`}>
+          <Badge variant={statusVariants[status]} className="cursor-pointer">
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Badge>
+        </Link>
       );
     },
   },
@@ -143,7 +190,7 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem asChild>
               <Link href={`/invoices/${invoice.id}`}>

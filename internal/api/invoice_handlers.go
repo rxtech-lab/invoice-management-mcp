@@ -10,12 +10,13 @@ import (
 )
 
 // CreateInvoiceRequest represents the request body for creating an invoice
+// Note: Amount is not included - it's calculated from invoice items
 type CreateInvoiceRequest struct {
 	Title                string               `json:"title" validate:"required"`
 	Description          string               `json:"description"`
 	InvoiceStartedAt     *time.Time           `json:"invoice_started_at"`
 	InvoiceEndedAt       *time.Time           `json:"invoice_ended_at"`
-	Amount               float64              `json:"amount"`
+	ReceiverID           *uint                `json:"receiver_id"`
 	Currency             string               `json:"currency"`
 	CategoryID           *uint                `json:"category_id"`
 	CompanyID            *uint                `json:"company_id"`
@@ -34,12 +35,13 @@ type CreateItemRequest struct {
 }
 
 // UpdateInvoiceRequest represents the request body for updating an invoice
+// Note: Amount is not included - it's calculated from invoice items
 type UpdateInvoiceRequest struct {
 	Title                string               `json:"title"`
 	Description          string               `json:"description"`
 	InvoiceStartedAt     *time.Time           `json:"invoice_started_at"`
 	InvoiceEndedAt       *time.Time           `json:"invoice_ended_at"`
-	Amount               float64              `json:"amount"`
+	ReceiverID           *uint                `json:"receiver_id"`
 	Currency             string               `json:"currency"`
 	CategoryID           *uint                `json:"category_id"`
 	CompanyID            *uint                `json:"company_id"`
@@ -106,12 +108,13 @@ func (s *APIServer) handleCreateInvoice(c *fiber.Ctx) error {
 		})
 	}
 
+	// Note: Amount is not set here - it's calculated from invoice items
 	invoice := &models.Invoice{
 		Title:                req.Title,
 		Description:          req.Description,
 		InvoiceStartedAt:     req.InvoiceStartedAt,
 		InvoiceEndedAt:       req.InvoiceEndedAt,
-		Amount:               req.Amount,
+		ReceiverID:           req.ReceiverID,
 		Currency:             req.Currency,
 		CategoryID:           req.CategoryID,
 		CompanyID:            req.CompanyID,
@@ -158,6 +161,10 @@ func (s *APIServer) handleListInvoices(c *fiber.Ctx) error {
 	if companyID, err := strconv.ParseUint(c.Query("company_id", ""), 10, 32); err == nil {
 		id := uint(companyID)
 		opts.CompanyID = &id
+	}
+	if receiverID, err := strconv.ParseUint(c.Query("receiver_id", ""), 10, 32); err == nil {
+		id := uint(receiverID)
+		opts.ReceiverID = &id
 	}
 	if status := c.Query("status", ""); status != "" {
 		s := models.InvoiceStatus(status)
@@ -214,13 +221,14 @@ func (s *APIServer) handleUpdateInvoice(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
+	// Note: Amount is not set here - it's calculated from invoice items
 	invoice := &models.Invoice{
 		ID:                   uint(id),
 		Title:                req.Title,
 		Description:          req.Description,
 		InvoiceStartedAt:     req.InvoiceStartedAt,
 		InvoiceEndedAt:       req.InvoiceEndedAt,
-		Amount:               req.Amount,
+		ReceiverID:           req.ReceiverID,
 		Currency:             req.Currency,
 		CategoryID:           req.CategoryID,
 		CompanyID:            req.CompanyID,

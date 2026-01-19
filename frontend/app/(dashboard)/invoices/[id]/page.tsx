@@ -4,6 +4,7 @@ import { InvoiceItemsTable } from "@/components/forms/invoice-items-table";
 import { getInvoice } from "@/lib/api/invoices";
 import { getCategories } from "@/lib/api/categories";
 import { getCompanies } from "@/lib/api/companies";
+import { getReceivers } from "@/lib/api/receivers";
 
 interface InvoiceDetailPageProps {
   params: Promise<{ id: string }>;
@@ -19,30 +20,36 @@ export default async function InvoiceDetailPage({
     notFound();
   }
 
+  let invoice;
+  let categoriesResponse;
+  let companiesResponse;
+  let receiversResponse;
+
   try {
-    const [invoice, categoriesResponse, companiesResponse] = await Promise.all([
+    [invoice, categoriesResponse, companiesResponse, receiversResponse] = await Promise.all([
       getInvoice(invoiceId),
       getCategories({ limit: 100 }),
       getCompanies({ limit: 100 }),
+      getReceivers({ limit: 100 }),
     ]);
-
-    return (
-      <div className="space-y-6">
-        <div className="max-w-2xl">
-          <InvoiceForm
-            invoice={invoice}
-            categories={categoriesResponse.data || []}
-            companies={companiesResponse.data || []}
-          />
-        </div>
-        <InvoiceItemsTable
-          invoiceId={invoice.id}
-          items={invoice.items || []}
-          currency={invoice.currency}
-        />
-      </div>
-    );
   } catch {
     notFound();
   }
+
+  return (
+    <div className="max-w-4xl space-y-6">
+      <InvoiceForm
+        invoice={invoice}
+        categories={categoriesResponse.data || []}
+        companies={companiesResponse.data || []}
+        receivers={receiversResponse.data || []}
+      />
+
+      <InvoiceItemsTable
+        invoiceId={invoice.id}
+        items={invoice.items || []}
+        currency={invoice.currency}
+      />
+    </div>
+  );
 }

@@ -32,6 +32,7 @@ func main() {
 	// Initialize services
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
+	receiverService := services.NewReceiverService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := initUploadService()
 
@@ -40,6 +41,7 @@ func main() {
 		dbService,
 		categoryService,
 		companyService,
+		receiverService,
 		invoiceService,
 		uploadService,
 	)
@@ -50,6 +52,7 @@ func main() {
 		dbService,
 		categoryService,
 		companyService,
+		receiverService,
 		invoiceService,
 		uploadService,
 		mcpSrv.GetServer(),

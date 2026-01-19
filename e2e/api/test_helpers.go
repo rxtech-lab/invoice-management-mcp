@@ -23,6 +23,7 @@ type TestSetup struct {
 	DBService       services.DBService
 	CategoryService services.CategoryService
 	CompanyService  services.CompanyService
+	ReceiverService services.ReceiverService
 	InvoiceService  services.InvoiceService
 	UploadService   services.UploadService
 	APIServer       *api.APIServer
@@ -41,6 +42,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	// Create services
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
+	receiverService := services.NewReceiverService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := services.NewMockUploadService()
 
@@ -49,6 +51,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 		dbService,
 		categoryService,
 		companyService,
+		receiverService,
 		invoiceService,
 		uploadService,
 		nil, // No MCP server for tests
@@ -65,6 +68,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 		DBService:       dbService,
 		CategoryService: categoryService,
 		CompanyService:  companyService,
+		ReceiverService: receiverService,
 		InvoiceService:  invoiceService,
 		UploadService:   uploadService,
 		APIServer:       apiServer,
@@ -227,11 +231,11 @@ func (s *TestSetup) CreateTestCompany(name string) (uint, error) {
 }
 
 // CreateTestInvoice creates a test invoice
+// Note: amount is not set - it's calculated from invoice items
 func (s *TestSetup) CreateTestInvoice(title string, categoryID, companyID *uint) (uint, error) {
 	invoice := map[string]interface{}{
 		"title":       title,
 		"description": "Test invoice",
-		"amount":      100.50,
 		"currency":    "USD",
 		"status":      "unpaid",
 	}
@@ -265,6 +269,29 @@ func (s *TestSetup) CreateTestInvoiceItem(invoiceID uint, description string, qu
 	}
 
 	resp, err := s.MakeRequest("POST", "/api/invoices/"+uintToStringHelper(invoiceID)+"/items", item)
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := s.ReadResponseBody(resp)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint(result["id"].(float64)), nil
+}
+
+// CreateTestReceiver creates a test receiver
+func (s *TestSetup) CreateTestReceiver(name string, isOrganization bool) (uint, error) {
+	receiver := &struct {
+		Name           string `json:"name"`
+		IsOrganization bool   `json:"is_organization"`
+	}{
+		Name:           name,
+		IsOrganization: isOrganization,
+	}
+
+	resp, err := s.MakeRequest("POST", "/api/receivers", receiver)
 	if err != nil {
 		return 0, err
 	}

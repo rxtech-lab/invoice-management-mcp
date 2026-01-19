@@ -16,6 +16,8 @@ tags:
     description: Invoice category management
   - name: Companies
     description: Company/vendor management
+  - name: Receivers
+    description: Invoice receiver management
   - name: Invoices
     description: Invoice management
   - name: Invoice Items
@@ -270,6 +272,118 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/receivers:
+    get:
+      tags:
+        - Receivers
+      summary: List receivers
+      description: Returns a paginated list of receivers with optional search
+      operationId: listReceivers
+      parameters:
+        - name: keyword
+          in: query
+          description: Search keyword for receiver name
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of receivers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiverListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Receivers
+      summary: Create receiver
+      description: Creates a new invoice receiver
+      operationId: createReceiver
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReceiverRequest'
+      responses:
+        '201':
+          description: Receiver created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receiver'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/receivers/{id}:
+    get:
+      tags:
+        - Receivers
+      summary: Get receiver
+      description: Returns a receiver by ID
+      operationId: getReceiver
+      parameters:
+        - $ref: '#/components/parameters/ReceiverId'
+      responses:
+        '200':
+          description: Receiver details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receiver'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Receivers
+      summary: Update receiver
+      description: Updates an existing receiver
+      operationId: updateReceiver
+      parameters:
+        - $ref: '#/components/parameters/ReceiverId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReceiverRequest'
+      responses:
+        '200':
+          description: Receiver updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receiver'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - Receivers
+      summary: Delete receiver
+      description: Deletes a receiver
+      operationId: deleteReceiver
+      parameters:
+        - $ref: '#/components/parameters/ReceiverId'
+      responses:
+        '204':
+          description: Receiver deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/invoices:
     get:
       tags:
@@ -291,6 +405,11 @@ paths:
         - name: company_id
           in: query
           description: Filter by company ID
+          schema:
+            type: integer
+        - name: receiver_id
+          in: query
+          description: Filter by receiver ID
           schema:
             type: integer
         - name: status
@@ -627,6 +746,8 @@ components:
             write:categories: Create, update, delete categories
             read:companies: Read companies
             write:companies: Create, update, delete companies
+            read:receivers: Read receivers
+            write:receivers: Create, update, delete receivers
 
   parameters:
     CategoryId:
@@ -642,6 +763,14 @@ components:
       in: path
       required: true
       description: Company ID
+      schema:
+        type: integer
+
+    ReceiverId:
+      name: id
+      in: path
+      required: true
+      description: Receiver ID
       schema:
         type: integer
 
@@ -866,6 +995,66 @@ components:
         offset:
           type: integer
 
+    Receiver:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Receiver ID
+        user_id:
+          type: string
+          description: Owner user ID
+        name:
+          type: string
+          description: Receiver name
+        is_organization:
+          type: boolean
+          description: Whether the receiver is an organization
+          default: false
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateReceiverRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Receiver name
+        is_organization:
+          type: boolean
+          description: Whether the receiver is an organization
+          default: false
+
+    UpdateReceiverRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Receiver name
+        is_organization:
+          type: boolean
+          description: Whether the receiver is an organization
+
+    ReceiverListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Receiver'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
     InvoiceStatus:
       type: string
       enum:
@@ -930,7 +1119,7 @@ components:
         amount:
           type: number
           format: double
-          description: Total amount
+          description: Total amount (calculated from invoice items, read-only)
         currency:
           type: string
           description: Currency code (e.g., USD)
@@ -945,6 +1134,11 @@ components:
           description: Company ID
         company:
           $ref: '#/components/schemas/Company'
+        receiver_id:
+          type: integer
+          description: Receiver ID
+        receiver:
+          $ref: '#/components/schemas/Receiver'
         items:
           type: array
           items:
@@ -973,6 +1167,7 @@ components:
 
     CreateInvoiceRequest:
       type: object
+      description: Request body for creating an invoice. Note that amount is calculated from invoice items and cannot be set directly.
       required:
         - title
       properties:
@@ -987,15 +1182,14 @@ components:
         invoice_ended_at:
           type: string
           format: date-time
-        amount:
-          type: number
-          format: double
         currency:
           type: string
           default: USD
         category_id:
           type: integer
         company_id:
+          type: integer
+        receiver_id:
           type: integer
         original_download_link:
           type: string
@@ -1033,6 +1227,7 @@ components:
 
     UpdateInvoiceRequest:
       type: object
+      description: Request body for updating an invoice. Note that amount is calculated from invoice items and cannot be set directly.
       properties:
         title:
           type: string
@@ -1044,14 +1239,13 @@ components:
         invoice_ended_at:
           type: string
           format: date-time
-        amount:
-          type: number
-          format: double
         currency:
           type: string
         category_id:
           type: integer
         company_id:
+          type: integer
+        receiver_id:
           type: integer
         original_download_link:
           type: string
@@ -1160,3 +1354,5 @@ security:
       - write:categories
       - read:companies
       - write:companies
+      - read:receivers
+      - write:receivers

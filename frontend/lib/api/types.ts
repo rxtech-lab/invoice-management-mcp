@@ -59,6 +59,26 @@ export interface UpdateCompanyRequest {
   notes?: string;
 }
 
+// Receiver
+export interface Receiver {
+  id: number;
+  user_id: string;
+  name: string;
+  is_organization: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateReceiverRequest {
+  name: string;
+  is_organization?: boolean;
+}
+
+export interface UpdateReceiverRequest {
+  name?: string;
+  is_organization?: boolean;
+}
+
 // Invoice Item
 export interface InvoiceItem {
   id: number;
@@ -97,6 +117,8 @@ export interface Invoice {
   category?: Category;
   company_id: number | null;
   company?: Company;
+  receiver_id: number | null;
+  receiver?: Receiver;
   items: InvoiceItem[];
   original_download_link: string;
   tags: string[];
@@ -106,15 +128,16 @@ export interface Invoice {
   updated_at: string;
 }
 
+// Note: amount is not included - it's calculated from invoice items
 export interface CreateInvoiceRequest {
   title: string;
   description?: string;
   invoice_started_at?: string;
   invoice_ended_at?: string;
-  amount?: number;
   currency?: string;
   category_id?: number;
   company_id?: number;
+  receiver_id?: number;
   original_download_link?: string;
   tags?: string[];
   status?: InvoiceStatus;
@@ -122,15 +145,16 @@ export interface CreateInvoiceRequest {
   items?: CreateInvoiceItemRequest[];
 }
 
+// Note: amount is not included - it's calculated from invoice items
 export interface UpdateInvoiceRequest {
   title?: string;
   description?: string;
   invoice_started_at?: string;
   invoice_ended_at?: string;
-  amount?: number;
   currency?: string;
   category_id?: number;
   company_id?: number;
+  receiver_id?: number;
   original_download_link?: string;
   tags?: string[];
   status?: InvoiceStatus;
@@ -169,6 +193,7 @@ export interface InvoiceListOptions {
   keyword?: string;
   category_id?: number;
   company_id?: number;
+  receiver_id?: number;
   status?: InvoiceStatus;
   sort_by?: "created_at" | "updated_at" | "amount" | "due_date" | "title";
   sort_order?: "asc" | "desc";
@@ -183,6 +208,12 @@ export interface CategoryListOptions {
 }
 
 export interface CompanyListOptions {
+  keyword?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ReceiverListOptions {
   keyword?: string;
   limit?: number;
   offset?: number;

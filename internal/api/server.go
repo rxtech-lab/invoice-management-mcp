@@ -26,6 +26,7 @@ type APIServer struct {
 	dbService              services.DBService
 	categoryService        services.CategoryService
 	companyService         services.CompanyService
+	receiverService        services.ReceiverService
 	invoiceService         services.InvoiceService
 	uploadService          services.UploadService
 	mcpServer              *mcpserver.MCPServer
@@ -40,6 +41,7 @@ func NewAPIServer(
 	dbService services.DBService,
 	categoryService services.CategoryService,
 	companyService services.CompanyService,
+	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 	mcpServer *mcpserver.MCPServer,
@@ -91,6 +93,7 @@ func NewAPIServer(
 		dbService:              dbService,
 		categoryService:        categoryService,
 		companyService:         companyService,
+		receiverService:        receiverService,
 		invoiceService:         invoiceService,
 		uploadService:          uploadService,
 		mcpServer:              mcpServer,
@@ -145,6 +148,13 @@ func (s *APIServer) SetupRoutes() {
 	api.Get("/companies/:id", s.handleGetCompany)
 	api.Put("/companies/:id", s.handleUpdateCompany)
 	api.Delete("/companies/:id", s.handleDeleteCompany)
+
+	// Receiver routes
+	api.Post("/receivers", s.handleCreateReceiver)
+	api.Get("/receivers", s.handleListReceivers)
+	api.Get("/receivers/:id", s.handleGetReceiver)
+	api.Put("/receivers/:id", s.handleUpdateReceiver)
+	api.Delete("/receivers/:id", s.handleDeleteReceiver)
 
 	// Invoice routes
 	api.Post("/invoices", s.handleCreateInvoice)

@@ -28,10 +28,10 @@ func (s *InvoiceTestSuite) TestCreateInvoice() {
 	companyID, err := s.setup.CreateTestCompany("Test Company")
 	s.Require().NoError(err)
 
+	// Note: amount is not sent - it's calculated from invoice items
 	invoice := map[string]interface{}{
 		"title":       "Monthly Services",
 		"description": "Services for January 2024",
-		"amount":      1500.00,
 		"currency":    "USD",
 		"category_id": categoryID,
 		"company_id":  companyID,
@@ -48,7 +48,7 @@ func (s *InvoiceTestSuite) TestCreateInvoice() {
 
 	s.Equal("Monthly Services", result["title"])
 	s.Equal("Services for January 2024", result["description"])
-	s.Equal(float64(1500), result["amount"])
+	s.Equal(float64(0), result["amount"]) // Amount is 0 because no items were added
 	s.Equal("USD", result["currency"])
 	s.Equal("unpaid", result["status"])
 	s.NotNil(result["id"])
@@ -56,7 +56,7 @@ func (s *InvoiceTestSuite) TestCreateInvoice() {
 
 func (s *InvoiceTestSuite) TestCreateInvoiceMissingTitle() {
 	invoice := map[string]interface{}{
-		"amount": 100.00,
+		"currency": "USD",
 	}
 
 	resp, err := s.setup.MakeRequest("POST", "/api/invoices", invoice)
@@ -154,10 +154,10 @@ func (s *InvoiceTestSuite) TestUpdateInvoice() {
 	invoiceID, err := s.setup.CreateTestInvoice("Original Invoice", &categoryID, &companyID)
 	s.Require().NoError(err)
 
+	// Note: amount is not sent - it's calculated from invoice items
 	update := map[string]interface{}{
 		"title":       "Updated Invoice",
 		"description": "Updated description",
-		"amount":      2000.00,
 		"status":      "paid",
 	}
 
@@ -170,7 +170,7 @@ func (s *InvoiceTestSuite) TestUpdateInvoice() {
 
 	s.Equal("Updated Invoice", result["title"])
 	s.Equal("Updated description", result["description"])
-	s.Equal(float64(2000), result["amount"])
+	// Amount is not updated directly - it's calculated from items
 	s.Equal("paid", result["status"])
 }
 

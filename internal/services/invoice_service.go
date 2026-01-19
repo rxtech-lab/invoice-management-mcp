@@ -13,6 +13,7 @@ type InvoiceListOptions struct {
 	Keyword    string
 	CategoryID *uint
 	CompanyID  *uint
+	ReceiverID *uint
 	Status     *models.InvoiceStatus
 	Tags       []string
 	StartDate  *time.Time
@@ -54,20 +55,17 @@ func NewInvoiceService(db *gorm.DB) InvoiceService {
 }
 
 // CreateInvoice creates a new invoice with optional items
+// Amount is always calculated from items (0 if no items)
 func (s *invoiceService) CreateInvoice(userID string, invoice *models.Invoice) error {
 	invoice.UserID = userID
 
-	// Calculate item amounts and total
+	// Calculate item amounts and total - amount is always calculated from items
 	var totalAmount float64
 	for i := range invoice.Items {
 		invoice.Items[i].CalculateAmount()
 		totalAmount += invoice.Items[i].Amount
 	}
-
-	// Update invoice amount if items exist
-	if len(invoice.Items) > 0 {
-		invoice.Amount = totalAmount
-	}
+	invoice.Amount = totalAmount
 
 	return s.db.Create(invoice).Error
 }
@@ -78,6 +76,7 @@ func (s *invoiceService) GetInvoiceByID(userID string, id uint) (*models.Invoice
 	err := s.db.Where("id = ? AND user_id = ?", id, userID).
 		Preload("Category").
 		Preload("Company").
+		Preload("Receiver").
 		Preload("Items").
 		First(&invoice).Error
 	if err != nil {
@@ -105,6 +104,10 @@ func (s *invoiceService) ListInvoices(userID string, opts InvoiceListOptions) ([
 
 	if opts.CompanyID != nil {
 		query = query.Where("company_id = ?", *opts.CompanyID)
+	}
+
+	if opts.ReceiverID != nil {
+		query = query.Where("receiver_id = ?", *opts.ReceiverID)
 	}
 
 	if opts.Status != nil {
@@ -149,7 +152,7 @@ func (s *invoiceService) ListInvoices(userID string, opts InvoiceListOptions) ([
 	}
 
 	// Preload relationships
-	query = query.Preload("Category").Preload("Company").Preload("Items")
+	query = query.Preload("Category").Preload("Company").Preload("Receiver").Preload("Items")
 
 	if err := query.Find(&invoices).Error; err != nil {
 		return nil, 0, err
@@ -159,6 +162,7 @@ func (s *invoiceService) ListInvoices(userID string, opts InvoiceListOptions) ([
 }
 
 // UpdateInvoice updates an existing invoice
+// Note: Amount is NOT updated here - it's calculated from items
 func (s *invoiceService) UpdateInvoice(userID string, invoice *models.Invoice) error {
 	// Verify ownership
 	existing, err := s.GetInvoiceByID(userID, invoice.ID)
@@ -166,12 +170,12 @@ func (s *invoiceService) UpdateInvoice(userID string, invoice *models.Invoice) e
 		return fmt.Errorf("invoice not found: %w", err)
 	}
 
-	// Update fields
+	// Update fields (amount is NOT updated - it's calculated from items)
 	existing.Title = invoice.Title
 	existing.Description = invoice.Description
 	existing.InvoiceStartedAt = invoice.InvoiceStartedAt
 	existing.InvoiceEndedAt = invoice.InvoiceEndedAt
-	existing.Amount = invoice.Amount
+	existing.ReceiverID = invoice.ReceiverID
 	existing.Currency = invoice.Currency
 	existing.CategoryID = invoice.CategoryID
 	existing.CompanyID = invoice.CompanyID
@@ -211,6 +215,7 @@ func (s *invoiceService) SearchInvoices(userID string, query string) ([]models.I
 		userID, searchPattern, searchPattern).
 		Preload("Category").
 		Preload("Company").
+		Preload("Receiver").
 		Preload("Items").
 		Order("created_at DESC").
 		Find(&invoices).Error
@@ -322,6 +327,7 @@ func (s *invoiceService) GetOverdueInvoices(userID string) ([]models.Invoice, er
 		userID, models.InvoiceStatusUnpaid, now).
 		Preload("Category").
 		Preload("Company").
+		Preload("Receiver").
 		Preload("Items").
 		Order("due_date ASC").
 		Find(&invoices).Error

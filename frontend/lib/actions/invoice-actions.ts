@@ -3,13 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
+import { createMCPClient } from '@ai-sdk/mcp';
+import { ToolLoopAgent } from 'ai';
+import { auth } from "@/auth";
 import type {
   Invoice,
   CreateInvoiceRequest,
   UpdateInvoiceRequest,
   InvoiceStatus,
 } from "@/lib/api/types";
-
+import { invoiceAgentPrompt } from "../prompt";
 export async function createInvoiceAction(
   data: CreateInvoiceRequest
 ): Promise<{ success: boolean; data?: Invoice; error?: string }> {
@@ -97,4 +100,76 @@ export async function deleteInvoiceAndRedirect(id: number) {
     redirect("/invoices");
   }
   return result;
+}
+
+export async function createInvoiceWithAgentAction(fileUrl: string): Promise<{
+  success: boolean;
+  data?: Invoice;
+  error?: string;
+}> {
+  try {
+    const session = await auth();
+
+    if (!session?.accessToken) {
+      return {
+        success: false,
+        error: "Authentication required",
+      };
+    }
+
+    const url = process.env.NEXT_PUBLIC_API_URL! + "/mcp"
+
+    const httpClient = await createMCPClient({
+      transport: {
+        type: 'http',
+        url: url,
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+      },
+    });
+    const tools = await httpClient.tools()
+
+    const agent = new ToolLoopAgent({
+      model: process.env.INVOICE_AGENT_MODEL!,
+      instructions: invoiceAgentPrompt,
+      tools: {
+        ...tools,
+      },
+    });
+
+    const result = await agent.generate({
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Create an invoice for the following file, make sure to use tools to add the invoice to the database. The original download link is ${fileUrl}, make sure add this link to the invoice`,
+          },
+          {
+            type: 'file',
+            data: fileUrl,
+            mediaType: 'application/pdf',
+            filename: 'invoice.pdf',
+          },
+        ]
+      }]
+    });
+
+    console.log("Invoice created successfully", result);
+
+    return {
+      success: true,
+    }
+
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create invoice with agent",
+    };
+  }
+  return {
+    success: false,
+    error: "Agent invoice creation not yet implemented",
+  };
 }
