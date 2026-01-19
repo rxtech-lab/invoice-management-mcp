@@ -52,7 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // Token expired - attempt refresh
       if (!token.refreshToken) {
-        console.error("No refresh token available");
+        console.error("No refresh token available", token);
         return { ...token, error: "RefreshTokenError" };
       }
 

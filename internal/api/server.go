@@ -29,6 +29,7 @@ type APIServer struct {
 	receiverService        services.ReceiverService
 	invoiceService         services.InvoiceService
 	uploadService          services.UploadService
+	analyticsService       services.AnalyticsService
 	mcpServer              *mcpserver.MCPServer
 	mcprouterAuthenticator *auth.ApikeyAuthenticator
 	oauthAuthenticator     *middleware.OAuthAuthenticator
@@ -44,6 +45,7 @@ func NewAPIServer(
 	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
+	analyticsService services.AnalyticsService,
 	mcpServer *mcpserver.MCPServer,
 ) *APIServer {
 	app := fiber.New(fiber.Config{
@@ -96,6 +98,7 @@ func NewAPIServer(
 		receiverService:        receiverService,
 		invoiceService:         invoiceService,
 		uploadService:          uploadService,
+		analyticsService:       analyticsService,
 		mcpServer:              mcpServer,
 		mcprouterAuthenticator: mcprouterAuthenticator,
 		oauthAuthenticator:     oauthAuthenticator,
@@ -172,6 +175,12 @@ func (s *APIServer) SetupRoutes() {
 	// Upload routes
 	api.Post("/upload", s.handleUploadFile)
 	api.Get("/upload/presigned", s.handleGetPresignedURL)
+
+	// Analytics routes
+	api.Get("/analytics/summary", s.handleGetAnalyticsSummary)
+	api.Get("/analytics/by-category", s.handleGetAnalyticsByCategory)
+	api.Get("/analytics/by-company", s.handleGetAnalyticsByCompany)
+	api.Get("/analytics/by-receiver", s.handleGetAnalyticsByReceiver)
 }
 
 // EnableAuthentication enables authentication middleware (OAuth and/or MCPRouter)

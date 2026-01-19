@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { Plus, ChevronDown, Bot, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { readStreamableValue } from "@ai-sdk/rsc";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { createInvoiceWithAgentAction } from "@/lib/actions/invoice-actions";
+import { createInvoiceWithAgentAction, type ToolProgress } from "@/lib/actions/invoice-actions";
 import { uploadFileAction } from "@/lib/actions/upload-actions";
 import { useRouter } from "next/navigation";
 
@@ -59,21 +60,34 @@ export function NewInvoiceButton() {
         return;
       }
 
-      // Process with agent
+      // Process with agent (streaming)
       setLoadingState("processing");
       toast.loading("Processing invoice with AI agent...", { id: toastId });
 
-      const agentResult = await createInvoiceWithAgentAction(
+      const { progress } = await createInvoiceWithAgentAction(
         uploadResult.data.download_url
       );
 
-      if (agentResult.success) {
-        toast.success("Invoice created successfully!", { id: toastId });
+      let lastStatus: ToolProgress["status"] = "idle";
+
+      for await (const update of readStreamableValue(progress)) {
+        if (update) {
+          lastStatus = update.status;
+          if (update.status === "error") {
+            toast.error(update.message, { id: toastId });
+          } else if (update.status === "complete") {
+            toast.success(update.message, { id: toastId });
+            router.refresh();
+          } else {
+            toast.loading(update.message, { id: toastId });
+          }
+        }
+      }
+
+      // Handle case where stream ends without explicit complete/error
+      if (lastStatus !== "complete" && lastStatus !== "error") {
+        toast.success("Invoice processed!", { id: toastId });
         router.refresh();
-      } else {
-        toast.error(agentResult.error || "Failed to process invoice", {
-          id: toastId,
-        });
       }
     } catch (error) {
       toast.error("An unexpected error occurred: " + error, { id: toastId });

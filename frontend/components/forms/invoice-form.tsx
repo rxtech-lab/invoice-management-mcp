@@ -20,7 +20,7 @@ import { createInvoiceAction, updateInvoiceAction } from "@/lib/actions/invoice-
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 
 // Note: amount is not in the schema - it's calculated from invoice items
 const invoiceSchema = z.object({
@@ -259,12 +259,31 @@ export function InvoiceForm({ invoice, categories, companies, receivers }: Invoi
 
           <div className="space-y-2">
             <Label htmlFor="original_download_link">Original File URL</Label>
-            <Input
-              id="original_download_link"
-              type="url"
-              {...register("original_download_link")}
-              placeholder="https://..."
-            />
+            <div className="flex gap-2">
+              <Input
+                id="original_download_link"
+                type="url"
+                {...register("original_download_link")}
+                placeholder="https://..."
+              />
+              {watch("original_download_link") && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  asChild
+                >
+                  <a
+                    href={watch("original_download_link") || ""}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-4">

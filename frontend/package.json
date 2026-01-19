@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/mcp": "^1.0.10",
+    "@ai-sdk/rsc": "^2.0.39",
     "@auth/core": "^0.39.0",
     "@base-ui/react": "^1.1.0",
     "@hookform/resolvers": "^5.0.1",

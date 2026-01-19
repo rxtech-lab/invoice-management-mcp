@@ -19,16 +19,17 @@ import (
 
 // TestSetup contains all test dependencies
 type TestSetup struct {
-	t               *testing.T
-	DBService       services.DBService
-	CategoryService services.CategoryService
-	CompanyService  services.CompanyService
-	ReceiverService services.ReceiverService
-	InvoiceService  services.InvoiceService
-	UploadService   services.UploadService
-	APIServer       *api.APIServer
-	App             *fiber.App
-	TestUserID      string
+	t                *testing.T
+	DBService        services.DBService
+	CategoryService  services.CategoryService
+	CompanyService   services.CompanyService
+	ReceiverService  services.ReceiverService
+	InvoiceService   services.InvoiceService
+	UploadService    services.UploadService
+	AnalyticsService services.AnalyticsService
+	APIServer        *api.APIServer
+	App              *fiber.App
+	TestUserID       string
 }
 
 // NewTestSetup creates a new test setup with in-memory database
@@ -45,6 +46,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	receiverService := services.NewReceiverService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := services.NewMockUploadService()
+	analyticsService := services.NewAnalyticsService(db)
 
 	// Create API server
 	apiServer := api.NewAPIServer(
@@ -54,6 +56,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 		receiverService,
 		invoiceService,
 		uploadService,
+		analyticsService,
 		nil, // No MCP server for tests
 	)
 
@@ -64,16 +67,17 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	apiServer.SetupRoutes()
 
 	setup := &TestSetup{
-		t:               t,
-		DBService:       dbService,
-		CategoryService: categoryService,
-		CompanyService:  companyService,
-		ReceiverService: receiverService,
-		InvoiceService:  invoiceService,
-		UploadService:   uploadService,
-		APIServer:       apiServer,
-		App:             apiServer.GetFiberApp(),
-		TestUserID:      "test-user-123",
+		t:                t,
+		DBService:        dbService,
+		CategoryService:  categoryService,
+		CompanyService:   companyService,
+		ReceiverService:  receiverService,
+		InvoiceService:   invoiceService,
+		UploadService:    uploadService,
+		AnalyticsService: analyticsService,
+		APIServer:        apiServer,
+		App:              apiServer.GetFiberApp(),
+		TestUserID:       "test-user-123",
 	}
 
 	return setup

@@ -33,7 +33,7 @@ func (t *CreateInvoiceTool) GetTool() mcp.Tool {
 		mcp.WithString("invoice_started_at", mcp.Description("Billing cycle start (RFC3339)")),
 		mcp.WithString("invoice_ended_at", mcp.Description("Billing cycle end (RFC3339)")),
 		mcp.WithString("original_download_link", mcp.Description("Link to original invoice file")),
-		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue (default: unpaid)")),
+		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue (default: paid). Please justify the status base on the pdf file and the invoice items.")),
 		mcp.WithString("due_date", mcp.Description("Due date (RFC3339)")),
 	)
 }
@@ -59,7 +59,7 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 		originalDownloadLink, _ := args["original_download_link"].(string)
 
 		statusStr, _ := args["status"].(string)
-		status := models.InvoiceStatusUnpaid
+		status := models.InvoiceStatusPaid
 		if statusStr != "" {
 			status = models.InvoiceStatus(statusStr)
 		}

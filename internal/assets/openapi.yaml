@@ -26,6 +26,8 @@ tags:
     description: File upload operations
   - name: Health
     description: Health check endpoints
+  - name: Analytics
+    description: Invoice analytics and reporting
 
 paths:
   /health:
@@ -711,6 +713,106 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/analytics/summary:
+    get:
+      tags:
+        - Analytics
+      summary: Get invoice summary analytics
+      description: Returns total, paid, and unpaid invoice amounts for a time period
+      operationId: getAnalyticsSummary
+      parameters:
+        - name: period
+          in: query
+          description: Time period for analytics
+          schema:
+            type: string
+            enum: [7d, 1m, 1y]
+            default: 1m
+      responses:
+        '200':
+          description: Analytics summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analytics/by-category:
+    get:
+      tags:
+        - Analytics
+      summary: Get invoice analytics grouped by category
+      description: Returns invoice amounts grouped by category for a time period
+      operationId: getAnalyticsByCategory
+      parameters:
+        - name: period
+          in: query
+          description: Time period for analytics
+          schema:
+            type: string
+            enum: [7d, 1m, 1y]
+            default: 1m
+      responses:
+        '200':
+          description: Analytics by category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsByGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analytics/by-company:
+    get:
+      tags:
+        - Analytics
+      summary: Get invoice analytics grouped by company
+      description: Returns invoice amounts grouped by company for a time period
+      operationId: getAnalyticsByCompany
+      parameters:
+        - name: period
+          in: query
+          description: Time period for analytics
+          schema:
+            type: string
+            enum: [7d, 1m, 1y]
+            default: 1m
+      responses:
+        '200':
+          description: Analytics by company
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsByGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/analytics/by-receiver:
+    get:
+      tags:
+        - Analytics
+      summary: Get invoice analytics grouped by receiver
+      description: Returns invoice amounts grouped by receiver for a time period
+      operationId: getAnalyticsByReceiver
+      parameters:
+        - name: period
+          in: query
+          description: Time period for analytics
+          schema:
+            type: string
+            enum: [7d, 1m, 1y]
+            default: 1m
+      responses:
+        '200':
+          description: Analytics by receiver
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsByGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -1344,6 +1446,80 @@ components:
         content_type:
           type: string
           description: MIME type
+
+    AnalyticsSummary:
+      type: object
+      properties:
+        period:
+          type: string
+          description: Time period (7d, 1m, 1y)
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        total_amount:
+          type: number
+          format: double
+        paid_amount:
+          type: number
+          format: double
+        unpaid_amount:
+          type: number
+          format: double
+        overdue_amount:
+          type: number
+          format: double
+        invoice_count:
+          type: integer
+        paid_count:
+          type: integer
+        unpaid_count:
+          type: integer
+        overdue_count:
+          type: integer
+
+    AnalyticsGroupItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          description: Hex color (for categories)
+        total_amount:
+          type: number
+          format: double
+        paid_amount:
+          type: number
+          format: double
+        unpaid_amount:
+          type: number
+          format: double
+        invoice_count:
+          type: integer
+
+    AnalyticsByGroup:
+      type: object
+      properties:
+        period:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsGroupItem'
+        uncategorized:
+          $ref: '#/components/schemas/AnalyticsGroupItem'
+          description: Invoices without category/company/receiver
 
 security:
   - BearerAuth: []

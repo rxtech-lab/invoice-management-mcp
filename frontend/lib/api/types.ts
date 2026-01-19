@@ -223,3 +223,38 @@ export interface ReceiverListOptions {
 export interface ApiError {
   error: string;
 }
+
+// Analytics Types
+export type AnalyticsPeriod = "7d" | "1m" | "1y";
+
+export interface AnalyticsSummary {
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_amount: number;
+  paid_amount: number;
+  unpaid_amount: number;
+  overdue_amount: number;
+  invoice_count: number;
+  paid_count: number;
+  unpaid_count: number;
+  overdue_count: number;
+}
+
+export interface AnalyticsGroupItem {
+  id: number;
+  name: string;
+  color?: string;
+  total_amount: number;
+  paid_amount: number;
+  unpaid_amount: number;
+  invoice_count: number;
+}
+
+export interface AnalyticsByGroup {
+  period: string;
+  start_date: string;
+  end_date: string;
+  items: AnalyticsGroupItem[];
+  uncategorized?: AnalyticsGroupItem;
+}
