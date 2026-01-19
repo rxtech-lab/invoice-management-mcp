@@ -713,6 +713,38 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/files/{key}/download:
+    get:
+      tags:
+        - Upload
+      summary: Get file download URL
+      description: Generates a presigned download URL for a file. Only the file owner can access this.
+      operationId: getFileDownloadURL
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: S3 object key of the file
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Download URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileDownloadURLResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden - user does not own this file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/analytics/summary:
     get:
       tags:
@@ -1446,6 +1478,24 @@ components:
         content_type:
           type: string
           description: MIME type
+
+    FileDownloadURLResponse:
+      type: object
+      properties:
+        download_url:
+          type: string
+          format: uri
+          description: Presigned download URL (expires in 1 hour)
+        key:
+          type: string
+          description: S3 object key
+        filename:
+          type: string
+          description: Original filename
+        expires_at:
+          type: string
+          format: date-time
+          description: URL expiration time
 
     AnalyticsSummary:
       type: object

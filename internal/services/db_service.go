@@ -115,6 +115,7 @@ func (s *dbService) migrate() error {
 		&models.InvoiceReceiver{},
 		&models.Invoice{},
 		&models.InvoiceItem{},
+		&models.FileUpload{},
 	)
 }
 

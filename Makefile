@@ -1,6 +1,7 @@
-.PHONY: build test run clean deps help install-local fmt lint
+.PHONY: build test run clean deps help install-local fmt lint generate clean-generated
 
 BINARY_NAME=invoice-management
+OPENAPI_SPEC=internal/assets/openapi.yaml
 BUILD_DIR=./bin
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -69,6 +70,25 @@ lint:
 sec:
 	gosec ./...
 
+# Generate code from OpenAPI spec
+generate:
+	@echo "Generating code from OpenAPI spec..."
+	@mkdir -p internal/api/generated
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 \
+		--config oapi-codegen/types.cfg.yaml \
+		$(OPENAPI_SPEC)
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 \
+		--config oapi-codegen/server.cfg.yaml \
+		$(OPENAPI_SPEC)
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 \
+		--config oapi-codegen/client.cfg.yaml \
+		$(OPENAPI_SPEC)
+	@echo "Code generation complete"
+
+# Clean generated files
+clean-generated:
+	rm -f internal/api/generated/*.gen.go
+
 # Show help
 help:
 	@echo "Invoice Management System - Makefile Commands"
@@ -88,6 +108,10 @@ help:
 	@echo "  fmt          - Format code"
 	@echo "  lint         - Run linter"
 	@echo "  sec          - Run security scan"
+	@echo ""
+	@echo "Code Generation:"
+	@echo "  generate     - Generate code from OpenAPI spec"
+	@echo "  clean-generated - Remove generated files"
 	@echo ""
 	@echo "Other:"
 	@echo "  deps         - Download dependencies"

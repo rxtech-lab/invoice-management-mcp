@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import type { UploadResponse, PresignedURLResponse } from "@/lib/api/types";
+import type { UploadResponse, PresignedURLResponse, FileDownloadURLResponse } from "@/lib/api/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -72,6 +72,38 @@ export async function getPresignedURLAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to get presigned URL",
+    };
+  }
+}
+
+export async function getFileDownloadURLAction(
+  key: string
+): Promise<{ success: boolean; data?: FileDownloadURLResponse; error?: string }> {
+  try {
+    const session = await auth();
+
+    const headers: HeadersInit = {};
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+
+    const encodedKey = encodeURIComponent(key);
+    const response = await fetch(
+      `${API_BASE_URL}/api/files/${encodedKey}/download`,
+      { headers }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `Failed to get download URL: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get download URL",
     };
   }
 }
