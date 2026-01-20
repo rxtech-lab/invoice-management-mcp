@@ -1,6 +1,8 @@
-import { createMCPClient } from "@ai-sdk/mcp";
-import { streamText, stepCountIs } from "ai";
-import { invoiceAgentPrompt } from "@/lib/prompt";
+import { runInvoiceAgent } from "@/lib/agent/invoice-agent";
+import {
+  uploadFromURL,
+  getFileDownloadURLWithToken,
+} from "@/lib/api/upload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,20 +11,7 @@ interface AgentProgress {
   status: "idle" | "calling" | "complete" | "error";
   toolName?: string;
   message: string;
-}
-
-function formatToolName(toolName: string): string {
-  // Convert "create_invoice" to "Creating Invoice"
-  const words = toolName.replace(/_/g, " ").split(" ");
-  if (words.length > 0) {
-    const firstWord = words[0];
-    if (firstWord.endsWith("e")) {
-      words[0] = firstWord.slice(0, -1) + "ing";
-    } else {
-      words[0] = firstWord + "ing";
-    }
-  }
-  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  invoice_id?: number;
 }
 
 export async function POST(request: Request) {
@@ -66,64 +55,57 @@ export async function POST(request: Request) {
       };
 
       try {
-        // Connect to MCP server with the OAuth token from header
-        const mcpUrl = process.env.NEXT_PUBLIC_API_URL! + "/mcp";
-        const httpClient = await createMCPClient({
-          transport: {
-            type: "http",
-            url: mcpUrl,
-            headers: {
-              Authorization: `Bearer ${token}`, // Pass OAuth token to backend
-            },
-          },
-        });
-
+        // Step 1: Upload file from external URL to S3
         sendEvent("progress", {
           status: "calling",
-          message: "Connecting to AI agent...",
+          message: "Uploading file to storage...",
         });
 
-        const tools = await httpClient.tools();
+        const uploadResult = await uploadFromURL(fileUrl, token);
+        if (!uploadResult.success || !uploadResult.data) {
+          sendEvent("error", {
+            status: "error",
+            message: uploadResult.error || "Failed to upload file",
+          });
+          controller.close();
+          return;
+        }
 
-        const result = streamText({
-          model: process.env
-            .INVOICE_AGENT_MODEL! as Parameters<typeof streamText>[0]["model"],
-          system: invoiceAgentPrompt,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `Create an invoice for the following file, make sure to use tools to add the invoice to the database. The original download link is ${fileUrl}, make sure add this link to the invoice`,
-                },
-                {
-                  type: "file",
-                  data: new URL(fileUrl),
-                  mediaType: "application/pdf",
-                },
-              ],
-            },
-          ],
-          tools: tools,
-          stopWhen: stepCountIs(15),
-          onChunk: ({ chunk }) => {
-            if (chunk.type === "tool-call") {
-              sendEvent("progress", {
-                status: "calling",
-                toolName: chunk.toolName,
-                message: `${formatToolName(chunk.toolName)}...`,
-              });
-            }
+        const fileKey = uploadResult.data.key;
+
+        // Step 2: Get presigned download URL for the uploaded file
+        sendEvent("progress", {
+          status: "calling",
+          message: "Preparing file for processing...",
+        });
+
+        const downloadResult = await getFileDownloadURLWithToken(fileKey, token);
+        if (!downloadResult.success || !downloadResult.data) {
+          sendEvent("error", {
+            status: "error",
+            message: downloadResult.error || "Failed to get file download URL",
+          });
+          controller.close();
+          return;
+        }
+
+        const downloadUrl = downloadResult.data.download_url;
+
+        // Step 3: Run the invoice agent with the S3 file
+        const result = await runInvoiceAgent({
+          fileUrl: downloadUrl,
+          fileKey: fileKey,
+          accessToken: token,
+          onProgress: (progress) => {
+            sendEvent("progress", progress);
           },
         });
 
-        // Wait for completion
-        await result.text;
-
+        // Send completion event with invoice ID
         sendEvent("complete", {
           status: "complete",
           message: "Invoice created successfully!",
+          invoice_id: result.invoiceId ?? undefined,
         });
       } catch (error) {
         console.error("Agent error:", error);

@@ -3,9 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
-import { createMCPClient } from '@ai-sdk/mcp';
-import { streamText, stepCountIs } from 'ai';
-import { createStreamableValue } from '@ai-sdk/rsc';
+import { createStreamableValue } from "@ai-sdk/rsc";
 import { auth } from "@/auth";
 import type {
   Invoice,
@@ -13,14 +11,22 @@ import type {
   UpdateInvoiceRequest,
   InvoiceStatus,
 } from "@/lib/api/types";
-import { invoiceAgentPrompt } from "../prompt";
 import { getFileDownloadURLAction } from "./upload-actions";
+import { runInvoiceAgent } from "../agent/invoice-agent";
 
+// Define types locally to avoid bundling issues with server actions
 export type ToolProgress = {
-  status: 'idle' | 'calling' | 'complete' | 'error';
+  status: "idle" | "calling" | "complete" | "error";
   toolName?: string;
   message: string;
+  invoiceId?: number;
 };
+
+// Extended type for server action progress with invoice ID
+export type AgentProgress = ToolProgress & {
+  invoiceId?: number;
+};
+
 export async function createInvoiceAction(
   data: CreateInvoiceRequest
 ): Promise<{ success: boolean; data?: Invoice; error?: string }> {
@@ -110,36 +116,21 @@ export async function deleteInvoiceAndRedirect(id: number) {
   return result;
 }
 
-function formatToolName(toolName: string): string {
-  // Convert "create_invoice" to "Creating Invoice"
-  const words = toolName.replace(/_/g, ' ').split(' ');
-  if (words.length > 0) {
-    // Add "ing" to first word (simple approximation)
-    const firstWord = words[0];
-    if (firstWord.endsWith('e')) {
-      words[0] = firstWord.slice(0, -1) + 'ing';
-    } else {
-      words[0] = firstWord + 'ing';
-    }
-  }
-  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
 export async function createInvoiceWithAgentAction(fileKey: string) {
   const session = await auth();
 
   if (!session?.accessToken) {
-    const errorStream = createStreamableValue<ToolProgress>({
-      status: 'error',
-      message: 'Authentication required',
+    const errorStream = createStreamableValue<AgentProgress>({
+      status: "error",
+      message: "Authentication required",
     });
     errorStream.done();
     return { progress: errorStream.value };
   }
 
-  const progressStream = createStreamableValue<ToolProgress>({
-    status: 'idle',
-    message: 'Initializing...',
+  const progressStream = createStreamableValue<AgentProgress>({
+    status: "idle",
+    message: "Initializing...",
   });
 
   // Run async to allow returning stream immediately
@@ -147,86 +138,44 @@ export async function createInvoiceWithAgentAction(fileKey: string) {
     try {
       // Fetch download URL from file key
       progressStream.update({
-        status: 'calling',
-        message: 'Fetching file URL...',
+        status: "calling",
+        message: "Fetching file URL...",
       });
 
       const downloadResult = await getFileDownloadURLAction(fileKey);
       if (!downloadResult.success || !downloadResult.data) {
         progressStream.done({
-          status: 'error',
-          message: downloadResult.error || 'Failed to get file download URL',
+          status: "error",
+          message: downloadResult.error || "Failed to get file download URL",
         });
         return;
       }
 
       const fileUrl = downloadResult.data.download_url;
 
-      const url = process.env.NEXT_PUBLIC_API_URL! + "/mcp";
-
-      const httpClient = await createMCPClient({
-        transport: {
-          type: 'http',
-          url: url,
-          headers: {
-            Authorization: `Bearer ${session.accessToken}`,
-          },
+      // Run the shared invoice agent
+      const result = await runInvoiceAgent({
+        fileUrl,
+        fileKey,
+        accessToken: session.accessToken!,
+        onProgress: (progress) => {
+          progressStream.update(progress);
         },
       });
 
-      progressStream.update({
-        status: 'calling',
-        message: 'Connecting to AI agent...',
-      });
-
-      const tools = await httpClient.tools();
-
-      const result = streamText({
-        model: process.env.INVOICE_AGENT_MODEL! as Parameters<typeof streamText>[0]['model'],
-        system: invoiceAgentPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Create an invoice for the following file, make sure to use tools to add the invoice to the database. The original_download_link should be set to "${fileKey}" (this is the file key, not a URL)`,
-              },
-              {
-                type: 'file',
-                data: new URL(fileUrl),
-                mediaType: 'application/pdf',
-              },
-            ],
-          },
-        ],
-        tools: tools,
-        stopWhen: stepCountIs(15),
-        onChunk: ({ chunk }) => {
-          if (chunk.type === 'tool-call') {
-            progressStream.update({
-              status: 'calling',
-              toolName: chunk.toolName,
-              message: `${formatToolName(chunk.toolName)}...`,
-            });
-          }
-        },
-      });
-
-      // Wait for completion
-      await result.text;
-
+      // Send completion with invoice ID
       progressStream.done({
-        status: 'complete',
-        message: 'Invoice created successfully!',
+        status: "complete",
+        message: "Invoice created successfully!",
+        invoiceId: result.invoiceId ?? undefined,
       });
 
-      revalidatePath('/invoices');
+      revalidatePath("/invoices");
     } catch (error) {
-      console.error('Agent error:', error);
+      console.error("Agent error:", error);
       progressStream.done({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Failed to create invoice',
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to create invoice",
       });
     }
   })();

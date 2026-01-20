@@ -5,7 +5,8 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
 
   // Public paths that don't require authentication
-  const publicPaths = ["/login", "/api/auth"];
+  // Note: /api/invoices/agent and /api/exchange-rate handle their own Bearer token authentication
+  const publicPaths = ["/login", "/api/auth", "/api/invoices/agent", "/api/exchange-rate"];
   const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
 
   // Redirect logged-in users away from login page
