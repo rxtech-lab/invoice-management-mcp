@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rxtech-lab/invoice-management/internal/api"
@@ -327,4 +328,51 @@ func SetupTestAuthMiddleware(app *fiber.App) {
 		}
 		return c.Next()
 	})
+}
+
+// CreateTestInvoiceWithStatus creates a test invoice with specific status and amount
+func (s *TestSetup) CreateTestInvoiceWithStatus(title string, categoryID, companyID *uint, status string, amount float64) (uint, error) {
+	// Create invoice
+	invoiceID, err := s.CreateTestInvoice(title, categoryID, companyID)
+	if err != nil {
+		return 0, err
+	}
+
+	// Add item to set the amount
+	_, err = s.CreateTestInvoiceItem(invoiceID, "Item", 1, amount)
+	if err != nil {
+		return 0, err
+	}
+
+	// Update status
+	update := map[string]interface{}{"status": status}
+	_, err = s.MakeRequest("PATCH", "/api/invoices/"+uintToStringHelper(invoiceID)+"/status", update)
+	if err != nil {
+		return 0, err
+	}
+
+	return invoiceID, nil
+}
+
+// CreateTestInvoiceOnDate creates a test invoice with specific date, status, and amount
+// Note: This updates the created_at field directly in the database for testing purposes
+func (s *TestSetup) CreateTestInvoiceOnDate(title string, categoryID, companyID *uint, status string, amount float64, createdAt time.Time) (uint, error) {
+	// Create invoice with status and amount
+	invoiceID, err := s.CreateTestInvoiceWithStatus(title, categoryID, companyID, status, amount)
+	if err != nil {
+		return 0, err
+	}
+
+	// Update created_at directly in the database
+	db := s.DBService.GetDB()
+	if err := db.Exec("UPDATE invoices SET created_at = ? WHERE id = ?", createdAt, invoiceID).Error; err != nil {
+		return 0, err
+	}
+
+	return invoiceID, nil
+}
+
+// DaysAgo returns a time that is n days ago from now
+func DaysAgo(n int) time.Time {
+	return time.Now().AddDate(0, 0, -n)
 }

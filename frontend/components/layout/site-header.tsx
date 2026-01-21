@@ -12,6 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { GlobalSearch } from "@/components/search/global-search";
 
 const routeTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -68,29 +69,33 @@ export function SiteHeader() {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-      <SidebarTrigger className="-ml-1" />
-      <Breadcrumb>
-        <BreadcrumbList>
-          {breadcrumbs.length === 0 ? (
-            <BreadcrumbItem>
-              <BreadcrumbPage>Dashboard</BreadcrumbPage>
-            </BreadcrumbItem>
-          ) : (
-            breadcrumbs.map((crumb, index) => (
-              <React.Fragment key={crumb.href}>
-                <BreadcrumbItem>
-                  {crumb.isLast ? (
-                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
-                {!crumb.isLast && <BreadcrumbSeparator />}
-              </React.Fragment>
-            ))
-          )}
-        </BreadcrumbList>
-      </Breadcrumb>
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="-ml-1" />
+        <Breadcrumb>
+          <BreadcrumbList>
+            {breadcrumbs.length === 0 ? (
+              <BreadcrumbItem>
+                <BreadcrumbPage>Dashboard</BreadcrumbPage>
+              </BreadcrumbItem>
+            ) : (
+              breadcrumbs.map((crumb, index) => (
+                <React.Fragment key={crumb.href}>
+                  <BreadcrumbItem>
+                    {crumb.isLast ? (
+                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                  {!crumb.isLast && <BreadcrumbSeparator />}
+                </React.Fragment>
+              ))
+            )}
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Separator orientation="vertical" className="mx-2 h-6 my-auto" />
+        <GlobalSearch />
+      </div>
     </header>
   );
 }

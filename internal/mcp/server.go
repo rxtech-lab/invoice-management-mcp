@@ -25,11 +25,12 @@ func NewMCPServer(
 	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
+	analyticsService services.AnalyticsService,
 ) *MCPServer {
 	mcpServer := &MCPServer{
 		dbService: dbService,
 	}
-	mcpServer.initializeTools(categoryService, companyService, receiverService, invoiceService, uploadService)
+	mcpServer.initializeTools(categoryService, companyService, receiverService, invoiceService, uploadService, analyticsService)
 	return mcpServer
 }
 
@@ -40,6 +41,7 @@ func (s *MCPServer) initializeTools(
 	receiverService services.ReceiverService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
+	analyticsService services.AnalyticsService,
 ) {
 	srv := server.NewMCPServer(
 		"Invoice Management MCP Server",
@@ -158,6 +160,10 @@ func (s *MCPServer) initializeTools(
 	getPresignedURLTool := tools.NewGetPresignedURLTool(uploadService)
 	srv.AddTool(getPresignedURLTool.GetTool(), getPresignedURLTool.GetHandler())
 
+	// Statistics Tools
+	invoiceStatisticsTool := tools.NewInvoiceStatisticsTool(analyticsService)
+	srv.AddTool(invoiceStatisticsTool.GetTool(), invoiceStatisticsTool.GetHandler())
+
 	s.server = srv
 }
 
@@ -271,7 +277,18 @@ Invoice Item Tools:
    Parameters: item_id (required), description, quantity, unit_price
 
 10. delete_invoice_item - Delete an invoice item
-    Parameters: item_id (required)`
+    Parameters: item_id (required)
+
+Statistics Tools:
+11. invoice_statistics - Get invoice statistics with time period filtering, grouping, and aggregations
+    Parameters: period (last_day/last_week/last_month/last_year), days, category_id, company_id,
+                receiver_id, status, keyword, group_by (day/week/month/category/company/receiver),
+                include_aggregations
+    Examples:
+    - "How much did I spend last week?" → period: "last_week"
+    - "Show daily spending for 7 days" → period: "last_week", group_by: "day"
+    - "Max spend last week?" → period: "last_week", include_aggregations: true
+    - "Electricity invoices last month" → period: "last_month", keyword: "electricity"`
 
 	case "upload":
 		return `File Upload Tools:
@@ -323,6 +340,10 @@ INVOICE MANAGEMENT (10 tools):
 
 FILE UPLOAD (1 tool):
 - get_presigned_url: Get URL for file upload
+
+STATISTICS (1 tool):
+- invoice_statistics: Get statistics with period/grouping/aggregations
+  Supports: "last_week day by day", "max spend last month", "compare by category"
 
 All tools require authentication. Invoices are user-scoped.`
 
