@@ -20,13 +20,14 @@ var (
 
 // StrictHandlers implements the generated StrictServerInterface
 type StrictHandlers struct {
-	categoryService   services.CategoryService
-	companyService    services.CompanyService
-	receiverService   services.ReceiverService
-	invoiceService    services.InvoiceService
-	uploadService     services.UploadService
-	fileUploadService services.FileUploadService
-	analyticsService  services.AnalyticsService
+	categoryService    services.CategoryService
+	companyService     services.CompanyService
+	receiverService    services.ReceiverService
+	invoiceService     services.InvoiceService
+	uploadService      services.UploadService
+	fileUploadService  services.FileUploadService
+	analyticsService   services.AnalyticsService
+	fileUnlinkService  services.FileUnlinkService
 }
 
 // NewStrictHandlers creates a new StrictHandlers instance
@@ -38,15 +39,17 @@ func NewStrictHandlers(
 	uploadService services.UploadService,
 	fileUploadService services.FileUploadService,
 	analyticsService services.AnalyticsService,
+	fileUnlinkService services.FileUnlinkService,
 ) *StrictHandlers {
 	return &StrictHandlers{
-		categoryService:   categoryService,
-		companyService:    companyService,
-		receiverService:   receiverService,
-		invoiceService:    invoiceService,
-		uploadService:     uploadService,
-		fileUploadService: fileUploadService,
-		analyticsService:  analyticsService,
+		categoryService:    categoryService,
+		companyService:     companyService,
+		receiverService:    receiverService,
+		invoiceService:     invoiceService,
+		uploadService:      uploadService,
+		fileUploadService:  fileUploadService,
+		analyticsService:   analyticsService,
+		fileUnlinkService:  fileUnlinkService,
 	}
 }
 

@@ -15,6 +15,9 @@ type AuthenticatedUser struct {
 // This is separate from the Fiber middleware context key to avoid confusion
 const MCPAuthenticatedUserContextKey = "mcp_authenticated_user"
 
+// AuthorizationHeaderContextKey is the context key for storing the Authorization header
+const AuthorizationHeaderContextKey = "authorization_header"
+
 // WithAuthenticatedUser stores an authenticated user in the context
 func WithAuthenticatedUser(ctx context.Context, user *AuthenticatedUser) context.Context {
 	return context.WithValue(ctx, MCPAuthenticatedUserContextKey, user)
@@ -90,4 +93,16 @@ func HasScope(ctx context.Context, scope string) bool {
 		}
 	}
 	return false
+}
+
+// WithAuthorizationHeader stores the Authorization header in the context
+func WithAuthorizationHeader(ctx context.Context, authHeader string) context.Context {
+	return context.WithValue(ctx, AuthorizationHeaderContextKey, authHeader)
+}
+
+// GetAuthorizationHeader retrieves the Authorization header from context
+// Returns the header and a boolean indicating if it was found
+func GetAuthorizationHeader(ctx context.Context) (string, bool) {
+	header, ok := ctx.Value(AuthorizationHeaderContextKey).(string)
+	return header, ok
 }

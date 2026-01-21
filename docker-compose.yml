@@ -30,6 +30,12 @@ services:
       # Authentication
       - MCPROUTER_SERVER_URL=${MCPROUTER_SERVER_URL:-}
       - MCPROUTER_SERVER_API_KEY=${MCPROUTER_SERVER_API_KEY:-}
+      - OAUTH_SERVER_URL=${OAUTH_SERVER_URL:-}
+      - OAUTH_ISSUER=${OAUTH_ISSUER:-}
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-}
+
+      # File Server (for unlinking files when invoices are deleted)
+      - FILE_SERVER_URL=${FILE_SERVER_URL:-}
     volumes:
       # Mount data directory for SQLite persistence (when not using Turso)
       - invoice_data:/app/data

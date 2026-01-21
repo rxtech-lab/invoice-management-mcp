@@ -37,6 +37,7 @@ func main() {
 	uploadService := initUploadService()
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
+	fileUnlinkService := initFileUnlinkService()
 
 	// Initialize MCP server
 	mcpSrv := mcpserver.NewMCPServer(
@@ -60,6 +61,7 @@ func main() {
 		uploadService,
 		fileUploadService,
 		analyticsService,
+		fileUnlinkService,
 		mcpSrv.GetServer(),
 	)
 
@@ -143,6 +145,23 @@ func initUploadService() services.UploadService {
 
 	log.Printf("S3 upload service initialized (bucket: %s)", bucket)
 	return service
+}
+
+func initFileUnlinkService() services.FileUnlinkService {
+	fileServerURL := os.Getenv("FILE_SERVER_URL")
+
+	if fileServerURL == "" {
+		log.Println("FILE_SERVER_URL not configured, file unlinking will be skipped")
+	} else {
+		log.Printf("File unlink service initialized (url: %s)", fileServerURL)
+	}
+
+	cfg := services.FileUnlinkConfig{
+		FileServerURL: fileServerURL,
+		// Use default timeout (5 seconds)
+	}
+
+	return services.NewFileUnlinkService(cfg)
 }
 
 func getEnvOrDefault(key, defaultValue string) string {

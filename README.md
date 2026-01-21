@@ -96,6 +96,46 @@ docker buildx build \
 - `v1.0.0` - Specific version tags
 - `main-<sha>` - Latest main branch build
 
+## Configuration
+
+### Environment Variables
+
+#### File Server Integration (Optional)
+
+- `FILE_SERVER_URL` - URL of the external file server for unlinking files when invoices are deleted
+  - Example: `https://files.example.com`
+  - When configured, the system will attempt to unlink files via the `/api/files/invoice?invoice_id=<id>` DELETE endpoint
+  - Requires OAuth authentication (Bearer token) to be passed from the client
+  - If the file server is unavailable, invoice deletion will still proceed successfully
+  - If not configured, file unlinking will be skipped
+
+#### OAuth Authentication (Optional)
+
+- `OAUTH_SERVER_URL` - OAuth server URL for authentication
+  - Example: `https://auth.example.com`
+- `OAUTH_ISSUER` - OAuth token issuer for JWT validation
+- `OAUTH_AUDIENCE` - OAuth audience for JWT validation
+
+#### MCPRouter Authentication (Optional)
+
+- `MCPROUTER_SERVER_URL` - MCPRouter server URL for API key authentication
+- `MCPROUTER_SERVER_API_KEY` - API key for MCPRouter authentication
+
+#### Database Configuration
+
+- `TURSO_DATABASE_URL` - Turso database connection URL (optional, uses SQLite if not set)
+- `TURSO_AUTH_TOKEN` - Turso authentication token
+- `SQLITE_DB_PATH` - Path to SQLite database file (default: `invoice.db`)
+
+#### S3-Compatible Storage
+
+- `S3_ENDPOINT` - S3-compatible storage endpoint
+- `S3_BUCKET` - S3 bucket name for file uploads
+- `S3_ACCESS_KEY` - S3 access key
+- `S3_SECRET_KEY` - S3 secret key
+- `S3_REGION` - S3 region (default: `us-east-1`)
+- `S3_USE_PATH_STYLE` - Use path-style URLs for S3 (default: `false`)
+
 ## MCP Tools
 
 The server provides 14 MCP tools for comprehensive crypto launchpad operations:
