@@ -186,6 +186,9 @@ func FiberOAuthMiddleware(authenticator *OAuthAuthenticator, onSuccess func(*fib
 		// Extract user from claims
 		user := authenticator.ExtractUser(claims)
 
+		// Store the Authorization header in locals for file unlinking
+		c.Locals("Authorization", authHeader)
+
 		// Call success callback
 		if onSuccess != nil {
 			if err := onSuccess(c, user); err != nil {

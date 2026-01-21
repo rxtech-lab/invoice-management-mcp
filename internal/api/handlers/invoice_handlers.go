@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/rxtech-lab/invoice-management/internal/api/generated"
 	"github.com/rxtech-lab/invoice-management/internal/models"
 	"github.com/rxtech-lab/invoice-management/internal/services"
+	"github.com/rxtech-lab/invoice-management/internal/utils"
 )
 
 // ListInvoices implements generated.StrictServerInterface
@@ -237,6 +239,18 @@ func (h *StrictHandlers) DeleteInvoice(
 	userID, err := getUserID(ctx)
 	if err != nil {
 		return generated.DeleteInvoice401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
+	}
+
+	// Attempt to unlink file from file server before deleting invoice
+	// Extract Authorization header from context if available
+	authHeader, _ := utils.GetAuthorizationHeader(ctx)
+
+	// Call file unlink service (will skip if no auth token or URL configured)
+	// Errors are logged but don't prevent invoice deletion
+	if err := h.fileUnlinkService.UnlinkInvoiceFile(ctx, uint(request.Id), authHeader); err != nil {
+		// Log the error but continue with invoice deletion
+		log.Printf("Warning: Failed to unlink file for invoice %d: %v", request.Id, err)
+		// This ensures invoice deletion succeeds even if file server is unavailable
 	}
 
 	if err := h.invoiceService.DeleteInvoice(userID, uint(request.Id)); err != nil {

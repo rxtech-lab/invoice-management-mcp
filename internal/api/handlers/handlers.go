@@ -27,6 +27,7 @@ type StrictHandlers struct {
 	uploadService     services.UploadService
 	fileUploadService services.FileUploadService
 	analyticsService  services.AnalyticsService
+	fileUnlinkService services.FileUnlinkService
 }
 
 // NewStrictHandlers creates a new StrictHandlers instance
@@ -38,6 +39,7 @@ func NewStrictHandlers(
 	uploadService services.UploadService,
 	fileUploadService services.FileUploadService,
 	analyticsService services.AnalyticsService,
+	fileUnlinkService services.FileUnlinkService,
 ) *StrictHandlers {
 	return &StrictHandlers{
 		categoryService:   categoryService,
@@ -47,6 +49,7 @@ func NewStrictHandlers(
 		uploadService:     uploadService,
 		fileUploadService: fileUploadService,
 		analyticsService:  analyticsService,
+		fileUnlinkService: fileUnlinkService,
 	}
 }
 

@@ -25,22 +25,26 @@ Visit [cryptolaunch.app](https://cryptolaunch.app) to download the latest versio
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd launchpad-mcp
 ```
 
 2. Install dependencies:
+
 ```bash
 make deps
 ```
 
 3. Build the project:
+
 ```bash
 make build
 ```
 
 4. Run the server:
+
 ```bash
 make run
 ```
@@ -63,6 +67,7 @@ docker run -d \
 #### Using Docker Compose
 
 1. Copy the environment file:
+
 ```bash
 cp .env.example .env
 ```
@@ -70,6 +75,7 @@ cp .env.example .env
 2. Edit `.env` with your configuration
 
 3. Run with Docker Compose:
+
 ```bash
 # Run with SQLite (default)
 docker compose up -d
@@ -96,23 +102,67 @@ docker buildx build \
 - `v1.0.0` - Specific version tags
 - `main-<sha>` - Latest main branch build
 
+## Configuration
+
+### Environment Variables
+
+#### File Server Integration (Optional)
+
+- `FILE_SERVER_URL` - URL of the external file server for unlinking files when invoices are deleted
+  - Example: `https://files.example.com`
+  - When configured, the system will attempt to unlink files via the `/api/files/invoice?invoice_id=<id>` DELETE endpoint
+  - Requires OAuth authentication (Bearer token) to be passed from the client
+  - If the file server is unavailable, invoice deletion will still proceed successfully
+  - If not configured, file unlinking will be skipped
+
+#### OAuth Authentication (Optional)
+
+- `OAUTH_SERVER_URL` - OAuth server URL for authentication
+  - Example: `https://auth.example.com`
+- `OAUTH_ISSUER` - OAuth token issuer for JWT validation
+- `OAUTH_AUDIENCE` - OAuth audience for JWT validation
+
+#### MCPRouter Authentication (Optional)
+
+- `MCPROUTER_SERVER_URL` - MCPRouter server URL for API key authentication
+- `MCPROUTER_SERVER_API_KEY` - API key for MCPRouter authentication
+
+#### Database Configuration
+
+- `TURSO_DATABASE_URL` - Turso database connection URL (optional, uses SQLite if not set)
+- `TURSO_AUTH_TOKEN` - Turso authentication token
+- `SQLITE_DB_PATH` - Path to SQLite database file (default: `invoice.db`)
+
+#### S3-Compatible Storage
+
+- `S3_ENDPOINT` - S3-compatible storage endpoint
+- `S3_BUCKET` - S3 bucket name for file uploads
+- `S3_ACCESS_KEY` - S3 access key
+- `S3_SECRET_KEY` - S3 secret key
+- `S3_REGION` - S3 region (default: `us-east-1`)
+- `S3_USE_PATH_STYLE` - Use path-style URLs for S3 (default: `false`)
+
 ## MCP Tools
 
 The server provides 14 MCP tools for comprehensive crypto launchpad operations:
 
 ### Chain Management
+
 - `select-chain` - Select blockchain (ethereum/solana)
 - `set-chain` - Configure RPC and chain ID
 
 ### Template Management
+
 - `list-template` - Search contract templates
 - `create-template` - Create new templates
 - `update-template` - Modify existing templates
 
 ### Token Deployment
+
 - `launch` - Deploy contracts with signing interface
 
 ### Uniswap Integration
+
 - `set-uniswap-version` - Configure Uniswap version
 - `create-liquidity-pool` - Create new pools
 - `add-liquidity` - Add liquidity to pools
@@ -125,15 +175,18 @@ The server provides 14 MCP tools for comprehensive crypto launchpad operations:
 ## Architecture
 
 ### Dual Server Design
+
 - **MCP Server**: Handles AI tool requests via stdio
 - **HTTP Server**: Provides transaction signing interfaces on random port
 
 ### Database
+
 - SQLite database stored at `~/launchpad.db`
 - Automatic migrations and schema management
 - Session-based transaction tracking
 
 ### Frontend
+
 - HTMX + Tailwind CSS for reactive interfaces
 - EIP-6963 wallet discovery for maximum compatibility
 - Client-side transaction signing for security
@@ -143,18 +196,21 @@ The server provides 14 MCP tools for comprehensive crypto launchpad operations:
 ### Basic Workflow
 
 1. **Setup Chain**:
+
 ```
 AI: Please select Ethereum as the active blockchain
 Tool: select-chain(chain_type="ethereum")
 ```
 
 2. **Configure Network**:
+
 ```
 AI: Set up Sepolia testnet
 Tool: set-chain(chain_type="ethereum", rpc="https://sepolia.infura.io/v3/...", chain_id="11155111")
 ```
 
 3. **Deploy Token**:
+
 ```
 AI: Deploy a token called "MyToken" with symbol "MTK"
 Tool: launch(template_id="1", token_name="MyToken", token_symbol="MTK", deployer_address="0x...")
@@ -162,6 +218,7 @@ Result: Signing URL generated for wallet connection
 ```
 
 4. **Create Liquidity Pool**:
+
 ```
 AI: Create a Uniswap pool with 1000 tokens and 1 ETH
 Tool: create-liquidity-pool(token_address="0x...", initial_token_amount="1000", initial_eth_amount="1")
@@ -181,6 +238,7 @@ Result: Pool creation URL for user signing
 ## Development
 
 ### Project Structure
+
 ```
 ├── cmd/main.go              # Application entry point
 ├── internal/
@@ -196,6 +254,7 @@ Result: Pool creation URL for user signing
 ### Adding New Tools
 
 1. Create tool file in `tools/` directory following the pattern:
+
 ```go
 func NewMyTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
     tool := mcp.NewTool("my_tool", ...)
@@ -207,6 +266,7 @@ func NewMyTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 ```
 
 2. Register tool in `internal/mcp/server.go`:
+
 ```go
 myTool, myHandler := tools.NewMyTool(db)
 srv.AddTool(myTool, myHandler)
@@ -215,6 +275,7 @@ srv.AddTool(myTool, myHandler)
 ### Testing
 
 Run all tests:
+
 ```bash
 make test
 ```
@@ -222,11 +283,13 @@ make test
 ### Building
 
 Build for production:
+
 ```bash
 make build
 ```
 
 Clean build artifacts:
+
 ```bash
 make clean
 ```
@@ -242,12 +305,14 @@ make clean
 ## Supported Networks
 
 ### Ethereum
+
 - Mainnet (Chain ID: 1)
 - Sepolia (Chain ID: 11155111)
 - Goerli (Chain ID: 5)
 - Custom networks via RPC configuration
 
 ### Solana
+
 - Mainnet Beta
 - Devnet
 - Testnet
@@ -275,6 +340,7 @@ make clean
 ## Support
 
 For issues and questions:
+
 - GitHub Issues: [Repository issues page]
 - Documentation: `docs/` directory
 - Example code: `example/` directory

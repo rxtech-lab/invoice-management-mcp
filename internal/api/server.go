@@ -34,6 +34,7 @@ type APIServer struct {
 	uploadService          services.UploadService
 	fileUploadService      services.FileUploadService
 	analyticsService       services.AnalyticsService
+	fileUnlinkService      services.FileUnlinkService
 	mcpServer              *mcpserver.MCPServer
 	mcprouterAuthenticator *auth.ApikeyAuthenticator
 	oauthAuthenticator     *middleware.OAuthAuthenticator
@@ -51,6 +52,7 @@ func NewAPIServer(
 	uploadService services.UploadService,
 	fileUploadService services.FileUploadService,
 	analyticsService services.AnalyticsService,
+	fileUnlinkService services.FileUnlinkService,
 	mcpServer *mcpserver.MCPServer,
 ) *APIServer {
 	app := fiber.New(fiber.Config{
@@ -110,16 +112,15 @@ func NewAPIServer(
 	}
 
 	srv := &APIServer{
-		app:                    app,
-		dbService:              dbService,
-		categoryService:        categoryService,
-		companyService:         companyService,
-		receiverService:        receiverService,
-		invoiceService:         invoiceService,
-		uploadService:          uploadService,
-		fileUploadService:      fileUploadService,
-		analyticsService:       analyticsService,
-		mcpServer:              mcpServer,
+		app:               app,
+		dbService:         dbService,
+		categoryService:   categoryService,
+		companyService:    companyService,
+		receiverService:   receiverService,
+		invoiceService:    invoiceService,
+		uploadService:     uploadService,
+		fileUploadService: fileUploadService,
+		analyticsService:  analyticsService, fileUnlinkService: fileUnlinkService, mcpServer: mcpServer,
 		mcprouterAuthenticator: mcprouterAuthenticator,
 		oauthAuthenticator:     oauthAuthenticator,
 	}
@@ -159,6 +160,7 @@ func (s *APIServer) SetupRoutes() {
 		s.uploadService,
 		s.fileUploadService,
 		s.analyticsService,
+		s.fileUnlinkService,
 	)
 
 	// Create strict handler wrapper (converts StrictServerInterface to ServerInterface)
@@ -185,6 +187,12 @@ func (s *APIServer) SetupRoutes() {
 
 				// Pass authenticated user to Go context for strict handlers
 				ctx := utils.WithAuthenticatedUser(c.UserContext(), user.(*utils.AuthenticatedUser))
+
+				// Pass Authorization header to Go context if available (for file unlinking)
+				if authHeader := c.Locals("Authorization"); authHeader != nil {
+					ctx = utils.WithAuthorizationHeader(ctx, authHeader.(string))
+				}
+
 				c.SetUserContext(ctx)
 				return c.Next()
 			},

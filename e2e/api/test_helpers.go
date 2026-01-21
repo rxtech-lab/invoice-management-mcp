@@ -50,6 +50,11 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
 
+	// Create file unlink service with empty URL (will skip unlinking)
+	fileUnlinkService := services.NewFileUnlinkService(services.FileUnlinkConfig{
+		FileServerURL: "",
+	})
+
 	// Create API server
 	apiServer := api.NewAPIServer(
 		dbService,
@@ -60,6 +65,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 		uploadService,
 		fileUploadService,
 		analyticsService,
+		fileUnlinkService,
 		nil, // No MCP server for tests
 	)
 
@@ -375,4 +381,127 @@ func (s *TestSetup) CreateTestInvoiceOnDate(title string, categoryID, companyID 
 // DaysAgo returns a time that is n days ago from now
 func DaysAgo(n int) time.Time {
 	return time.Now().AddDate(0, 0, -n)
+}
+
+// TestSetupWithFileServer extends TestSetup to support file server configuration and OAuth tokens
+type TestSetupWithFileServer struct {
+	*TestSetup
+	fileServerURL string
+	withOAuth     bool
+}
+
+// NewTestSetupWithFileServer creates a test setup with file server URL configuration
+func NewTestSetupWithFileServer(t *testing.T, fileServerURL string, withOAuth bool) *TestSetupWithFileServer {
+	// Create in-memory database
+	dbService, err := services.NewSqliteDBService(":memory:")
+	require.NoError(t, err, "Failed to create in-memory database")
+
+	db := dbService.GetDB()
+
+	// Create services
+	categoryService := services.NewCategoryService(db)
+	companyService := services.NewCompanyService(db)
+	receiverService := services.NewReceiverService(db)
+	invoiceService := services.NewInvoiceService(db)
+	uploadService := services.NewMockUploadService()
+	fileUploadService := services.NewFileUploadService(db)
+	analyticsService := services.NewAnalyticsService(db)
+
+	// Create file unlink service with the provided URL
+	fileUnlinkService := services.NewFileUnlinkService(services.FileUnlinkConfig{
+		FileServerURL: fileServerURL,
+		Timeout:       5 * time.Second,
+	})
+
+	// Create API server with file unlink service
+	apiServer := api.NewAPIServer(
+		dbService,
+		categoryService,
+		companyService,
+		receiverService,
+		invoiceService,
+		uploadService,
+		fileUploadService,
+		analyticsService,
+		fileUnlinkService,
+		nil, // No MCP server for tests
+	)
+
+	// Add test authentication middleware before routes
+	if withOAuth {
+		SetupTestAuthMiddlewareWithOAuth(apiServer.GetFiberApp())
+	} else {
+		SetupTestAuthMiddleware(apiServer.GetFiberApp())
+	}
+
+	// Setup routes
+	apiServer.SetupRoutes()
+
+	baseSetup := &TestSetup{
+		t:                t,
+		DBService:        dbService,
+		CategoryService:  categoryService,
+		CompanyService:   companyService,
+		ReceiverService:  receiverService,
+		InvoiceService:   invoiceService,
+		UploadService:    uploadService,
+		AnalyticsService: analyticsService,
+		APIServer:        apiServer,
+		App:              apiServer.GetFiberApp(),
+		TestUserID:       "test-user-123",
+	}
+
+	return &TestSetupWithFileServer{
+		TestSetup:     baseSetup,
+		fileServerURL: fileServerURL,
+		withOAuth:     withOAuth,
+	}
+}
+
+// MakeRequestWithOAuth makes an HTTP request with OAuth Bearer token
+func (s *TestSetupWithFileServer) MakeRequestWithOAuth(method, path string, body interface{}, token string) (*http.Response, error) {
+	var reqBody io.Reader
+	if body != nil {
+		jsonBytes, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		reqBody = bytes.NewReader(jsonBytes)
+	}
+
+	req := httptest.NewRequest(method, path, reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Test-User-ID", s.TestUserID)
+
+	// Add OAuth Bearer token
+	if token != "" {
+		req.Header.Set("X-Test-OAuth-Token", "Bearer "+token)
+	}
+
+	resp, err := s.App.Test(req, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// SetupTestAuthMiddlewareWithOAuth sets up test authentication middleware that supports OAuth tokens
+func SetupTestAuthMiddlewareWithOAuth(app *fiber.App) {
+	app.Use(func(c *fiber.Ctx) error {
+		userID := c.Get("X-Test-User-ID")
+		if userID != "" {
+			user := &utils.AuthenticatedUser{
+				Sub: userID,
+			}
+			c.Locals(middleware.AuthenticatedUserContextKey, user)
+
+			// Store OAuth token in locals if present
+			oauthToken := c.Get("X-Test-OAuth-Token")
+			if oauthToken != "" {
+				c.Locals("Authorization", oauthToken)
+			}
+		}
+		return c.Next()
+	})
 }
