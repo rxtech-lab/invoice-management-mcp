@@ -51,12 +51,19 @@ func (h *StrictHandlers) UploadFile(
 		return generated.UploadFile400JSONResponse{BadRequestJSONResponse: badRequest("Failed to save file metadata")}, nil
 	}
 
-	// Return only the key - download URL is obtained via /api/files/{key}/download
+	// Generate presigned download URL
+	downloadURL, err := h.uploadService.GetPresignedDownloadURL(ctx, key)
+	if err != nil {
+		// If we can't generate presigned URL, fail the upload
+		return generated.UploadFile400JSONResponse{BadRequestJSONResponse: badRequest("Failed to generate download URL")}, nil
+	}
+
 	return generated.UploadFile201JSONResponse{
-		Key:         ptr(key),
-		Filename:    ptr(filename),
-		Size:        ptr(len(content)),
-		ContentType: ptr(contentType),
+		Key:         key,
+		DownloadUrl: downloadURL,
+		Filename:    filename,
+		Size:        len(content),
+		ContentType: contentType,
 	}, nil
 }
 

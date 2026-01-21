@@ -67,6 +67,14 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
+// ptrIfNotEmpty returns a pointer to the given string, or nil if the string is empty
+func ptrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 // deref safely dereferences a pointer, returning zero value if nil
 func deref[T any](p *T) T {
 	if p == nil {
