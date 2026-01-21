@@ -49,7 +49,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	uploadService := services.NewMockUploadService()
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
-	
+
 	// Create file unlink service with empty URL (will skip unlinking)
 	fileUnlinkService := services.NewFileUnlinkService(services.FileUnlinkConfig{
 		FileServerURL: "",
@@ -406,7 +406,7 @@ func NewTestSetupWithFileServer(t *testing.T, fileServerURL string, withOAuth bo
 	uploadService := services.NewMockUploadService()
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
-	
+
 	// Create file unlink service with the provided URL
 	fileUnlinkService := services.NewFileUnlinkService(services.FileUnlinkConfig{
 		FileServerURL: fileServerURL,
@@ -472,7 +472,7 @@ func (s *TestSetupWithFileServer) MakeRequestWithOAuth(method, path string, body
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Test-User-ID", s.TestUserID)
-	
+
 	// Add OAuth Bearer token
 	if token != "" {
 		req.Header.Set("X-Test-OAuth-Token", "Bearer "+token)
@@ -495,7 +495,7 @@ func SetupTestAuthMiddlewareWithOAuth(app *fiber.App) {
 				Sub: userID,
 			}
 			c.Locals(middleware.AuthenticatedUserContextKey, user)
-			
+
 			// Store OAuth token in locals if present
 			oauthToken := c.Get("X-Test-OAuth-Token")
 			if oauthToken != "" {

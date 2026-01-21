@@ -67,20 +67,20 @@ func (s *FileUnlinkTestSuite) TestDeleteInvoiceWithOAuthTokenServerDown() {
 	// Setup mock file server that always returns 500 (server error)
 	mockFileServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attemptCount.Add(1)
-		
+
 		// Verify it's a DELETE request to /api/files/invoice
 		s.Equal(http.MethodDelete, r.Method)
 		s.Equal("/api/files/invoice", r.URL.Path)
-		
+
 		// Verify invoice_id query parameter exists
 		invoiceIDStr := r.URL.Query().Get("invoice_id")
 		s.NotEmpty(invoiceIDStr, "invoice_id query parameter should be present")
-		
+
 		// Verify Authorization header is present
 		authHeader := r.Header.Get("Authorization")
 		s.NotEmpty(authHeader, "Authorization header should be present")
 		s.Contains(authHeader, "Bearer", "Authorization header should contain Bearer token")
-		
+
 		// Return 500 to simulate server error
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -98,7 +98,7 @@ func (s *FileUnlinkTestSuite) TestDeleteInvoiceWithOAuthTokenServerDown() {
 	// Delete the invoice with OAuth token but server down
 	resp, err := setup.MakeRequestWithOAuth("DELETE", "/api/invoices/"+uintToString(invoiceID), nil, "test-token-123")
 	s.Require().NoError(err)
-	
+
 	// Invoice should still be deleted successfully despite file server errors
 	s.Equal(http.StatusNoContent, resp.StatusCode)
 
@@ -123,20 +123,20 @@ func (s *FileUnlinkTestSuite) TestDeleteInvoiceWithOAuthTokenServerUp() {
 	// Setup mock file server that returns 204 (success)
 	mockFileServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		unlinkCalled = true
-		
+
 		// Verify it's a DELETE request to /api/files/invoice
 		s.Equal(http.MethodDelete, r.Method)
 		s.Equal("/api/files/invoice", r.URL.Path)
-		
+
 		// Capture the invoice_id query parameter
 		receivedInvoiceID = r.URL.Query().Get("invoice_id")
 		s.NotEmpty(receivedInvoiceID, "invoice_id query parameter should be present")
-		
+
 		// Capture and verify Authorization header
 		receivedAuthHeader = r.Header.Get("Authorization")
 		s.NotEmpty(receivedAuthHeader, "Authorization header should be present")
 		s.Contains(receivedAuthHeader, "Bearer test-token-456", "Authorization header should match")
-		
+
 		// Return 204 No Content (success)
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -158,11 +158,11 @@ func (s *FileUnlinkTestSuite) TestDeleteInvoiceWithOAuthTokenServerUp() {
 
 	// Verify the file unlink endpoint was called
 	s.True(unlinkCalled, "File unlink API should have been called")
-	
+
 	// Verify the correct invoice ID was sent
 	expectedInvoiceID := strconv.FormatUint(uint64(invoiceID), 10)
 	s.Equal(expectedInvoiceID, receivedInvoiceID, "Correct invoice ID should be sent to file server")
-	
+
 	// Verify the Authorization header was passed correctly
 	s.Equal("Bearer test-token-456", receivedAuthHeader, "Authorization header should be passed correctly")
 
@@ -181,11 +181,11 @@ func (s *FileUnlinkTestSuite) TestDeleteInvoiceWithOAuthTokenServerReturns404() 
 	// Setup mock file server that returns 404 (not found)
 	mockFileServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		unlinkCalled = true
-		
+
 		// Verify request
 		s.Equal(http.MethodDelete, r.Method)
 		s.Equal("/api/files/invoice", r.URL.Path)
-		
+
 		// Return 404 Not Found (file already unlinked)
 		w.WriteHeader(http.StatusNotFound)
 	}))
