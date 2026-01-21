@@ -1447,6 +1447,12 @@ components:
 
     UploadResponse:
       type: object
+      required:
+        - key
+        - download_url
+        - filename
+        - size
+        - content_type
       properties:
         key:
           type: string
@@ -1454,7 +1460,7 @@ components:
         download_url:
           type: string
           format: uri
-          description: Download URL for the file
+          description: Presigned download URL (expires in 1 hour). For a fresh URL after expiration, use GET /api/files/{key}/download
         filename:
           type: string
           description: Original filename
