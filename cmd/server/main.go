@@ -46,6 +46,7 @@ func main() {
 		receiverService,
 		invoiceService,
 		uploadService,
+		analyticsService,
 	)
 
 	// Initialize API server
