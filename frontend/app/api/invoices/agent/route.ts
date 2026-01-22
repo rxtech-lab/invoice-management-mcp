@@ -1,8 +1,5 @@
 import { runInvoiceAgent } from "@/lib/agent/invoice-agent";
-import {
-  uploadFromURL,
-  getFileDownloadURLWithToken,
-} from "@/lib/api/upload";
+import { uploadFromURL, getFileDownloadURLWithToken } from "@/lib/api/upload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +15,9 @@ export async function POST(request: Request) {
   // Extract Bearer token from Authorization header
   const authHeader = request.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
+
+  // Check if streaming should be disabled
+  const disableStream = request.headers.get("X-Disable-Stream") === "true";
 
   if (!token) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -35,8 +35,10 @@ export async function POST(request: Request) {
     fileKey = body.file_key;
     if (!fileUrl && !fileKey) {
       return new Response(
-        JSON.stringify({ error: "Missing file_url or file_key in request body" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "Missing file_url or file_key in request body",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
   } catch {
@@ -46,13 +48,81 @@ export async function POST(request: Request) {
     });
   }
 
+  // Non-streaming mode: return JSON response
+  if (disableStream) {
+    try {
+      // Step 1: Upload file from external URL to S3 (skip if file_key provided)
+      if (!fileKey && fileUrl) {
+        const uploadResult = await uploadFromURL(fileUrl, token);
+        if (!uploadResult.success || !uploadResult.data) {
+          return new Response(
+            JSON.stringify({
+              status: "error",
+              message: uploadResult.error || "Failed to upload file",
+            }),
+            { status: 500, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        fileKey = uploadResult.data.key;
+      }
+
+      if (!fileKey) {
+        return new Response(
+          JSON.stringify({ status: "error", message: "No file key available" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      // Step 2: Get presigned download URL for the file
+      const downloadResult = await getFileDownloadURLWithToken(fileKey, token);
+      if (!downloadResult.success || !downloadResult.data) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            message: downloadResult.error || "Failed to get file download URL",
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      const downloadUrl = downloadResult.data.download_url;
+
+      // Step 3: Run the invoice agent with the S3 file
+      const result = await runInvoiceAgent({
+        fileUrl: downloadUrl,
+        fileKey: fileKey,
+        accessToken: token,
+        onProgress: () => {}, // No-op for non-streaming mode
+      });
+
+      return new Response(
+        JSON.stringify({
+          status: "complete",
+          message: "Invoice created successfully!",
+          invoice_id: result.invoiceId ?? undefined,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error("Agent error:", error);
+      return new Response(
+        JSON.stringify({
+          status: "error",
+          message:
+            error instanceof Error ? error.message : "Failed to create invoice",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  }
+
   // Create SSE response stream
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const sendEvent = (event: string, data: AgentProgress) => {
         controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
         );
       };
 
@@ -93,7 +163,10 @@ export async function POST(request: Request) {
           message: "Preparing file for processing...",
         });
 
-        const downloadResult = await getFileDownloadURLWithToken(fileKey, token);
+        const downloadResult = await getFileDownloadURLWithToken(
+          fileKey,
+          token,
+        );
         if (!downloadResult.success || !downloadResult.data) {
           sendEvent("error", {
             status: "error",
