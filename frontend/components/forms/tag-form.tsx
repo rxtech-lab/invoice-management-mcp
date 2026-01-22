@@ -5,20 +5,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ColorPicker } from "@/components/ui/color-picker";
-import { Category } from "@/lib/api/types";
-import { createCategoryAction, updateCategoryAction } from "@/lib/actions/category-actions";
+import { Tag } from "@/lib/api/types";
+import { createTagAction, updateTagAction } from "@/lib/actions/tag-actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
-const categorySchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
+const tagSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color (e.g., #FF5733)")
@@ -26,16 +24,16 @@ const categorySchema = z.object({
     .or(z.literal("")),
 });
 
-type CategoryFormData = z.infer<typeof categorySchema>;
+type TagFormData = z.infer<typeof tagSchema>;
 
-interface CategoryFormProps {
-  category?: Category;
+interface TagFormProps {
+  tag?: Tag;
 }
 
-export function CategoryForm({ category }: CategoryFormProps) {
+export function TagForm({ tag }: TagFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isEditing = !!category;
+  const isEditing = !!tag;
 
   const {
     register,
@@ -43,18 +41,17 @@ export function CategoryForm({ category }: CategoryFormProps) {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CategoryFormData>({
-    resolver: zodResolver(categorySchema),
+  } = useForm<TagFormData>({
+    resolver: zodResolver(tagSchema),
     defaultValues: {
-      name: category?.name || "",
-      description: category?.description || "",
-      color: category?.color || "",
+      name: tag?.name || "",
+      color: tag?.color || "#6B7280",
     },
   });
 
   const selectedColor = watch("color");
 
-  const onSubmit = async (data: CategoryFormData) => {
+  const onSubmit = async (data: TagFormData) => {
     setIsSubmitting(true);
     try {
       const payload = {
@@ -63,14 +60,14 @@ export function CategoryForm({ category }: CategoryFormProps) {
       };
 
       const result = isEditing
-        ? await updateCategoryAction(category.id, payload)
-        : await createCategoryAction(payload);
+        ? await updateTagAction(tag.id, payload)
+        : await createTagAction(payload);
 
       if (result.success) {
-        toast.success(isEditing ? "Category updated" : "Category created");
-        router.push("/categories");
+        toast.success(isEditing ? "Tag updated" : "Tag created");
+        router.push("/tags");
       } else {
-        toast.error(result.error || "Failed to save category");
+        toast.error(result.error || "Failed to save tag");
       }
     } finally {
       setIsSubmitting(false);
@@ -80,26 +77,16 @@ export function CategoryForm({ category }: CategoryFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{isEditing ? "Edit Category" : "Create Category"}</CardTitle>
+        <CardTitle>{isEditing ? "Edit Tag" : "Create Tag"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Category Name *</Label>
-            <Input id="name" {...register("name")} placeholder="Category name" />
+            <Label htmlFor="name">Tag Name *</Label>
+            <Input id="name" {...register("name")} placeholder="Tag name" />
             {errors.name && (
               <p className="text-sm text-destructive">{errors.name.message}</p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...register("description")}
-              placeholder="Category description"
-              rows={3}
-            />
           </div>
 
           <div className="space-y-2">
@@ -117,7 +104,7 @@ export function CategoryForm({ category }: CategoryFormProps) {
           <div className="flex gap-4">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Update Category" : "Create Category"}
+              {isEditing ? "Update Tag" : "Create Tag"}
             </Button>
             <Button
               type="button"

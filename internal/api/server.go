@@ -30,11 +30,13 @@ type APIServer struct {
 	categoryService        services.CategoryService
 	companyService         services.CompanyService
 	receiverService        services.ReceiverService
+	tagService             services.TagService
 	invoiceService         services.InvoiceService
 	uploadService          services.UploadService
 	fileUploadService      services.FileUploadService
 	analyticsService       services.AnalyticsService
 	fileUnlinkService      services.FileUnlinkService
+	pdfService             services.PDFService
 	mcpServer              *mcpserver.MCPServer
 	mcprouterAuthenticator *auth.ApikeyAuthenticator
 	oauthAuthenticator     *middleware.OAuthAuthenticator
@@ -48,11 +50,13 @@ func NewAPIServer(
 	categoryService services.CategoryService,
 	companyService services.CompanyService,
 	receiverService services.ReceiverService,
+	tagService services.TagService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 	fileUploadService services.FileUploadService,
 	analyticsService services.AnalyticsService,
 	fileUnlinkService services.FileUnlinkService,
+	pdfService services.PDFService,
 	mcpServer *mcpserver.MCPServer,
 ) *APIServer {
 	app := fiber.New(fiber.Config{
@@ -112,15 +116,19 @@ func NewAPIServer(
 	}
 
 	srv := &APIServer{
-		app:               app,
-		dbService:         dbService,
-		categoryService:   categoryService,
-		companyService:    companyService,
-		receiverService:   receiverService,
-		invoiceService:    invoiceService,
-		uploadService:     uploadService,
-		fileUploadService: fileUploadService,
-		analyticsService:  analyticsService, fileUnlinkService: fileUnlinkService, mcpServer: mcpServer,
+		app:                    app,
+		dbService:              dbService,
+		categoryService:        categoryService,
+		companyService:         companyService,
+		receiverService:        receiverService,
+		tagService:             tagService,
+		invoiceService:         invoiceService,
+		uploadService:          uploadService,
+		fileUploadService:      fileUploadService,
+		analyticsService:       analyticsService,
+		fileUnlinkService:      fileUnlinkService,
+		pdfService:             pdfService,
+		mcpServer:              mcpServer,
 		mcprouterAuthenticator: mcprouterAuthenticator,
 		oauthAuthenticator:     oauthAuthenticator,
 	}
@@ -156,11 +164,13 @@ func (s *APIServer) SetupRoutes() {
 		s.categoryService,
 		s.companyService,
 		s.receiverService,
+		s.tagService,
 		s.invoiceService,
 		s.uploadService,
 		s.fileUploadService,
 		s.analyticsService,
 		s.fileUnlinkService,
+		s.pdfService,
 	)
 
 	// Create strict handler wrapper (converts StrictServerInterface to ServerInterface)

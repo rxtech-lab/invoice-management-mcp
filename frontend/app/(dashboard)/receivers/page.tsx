@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table/data-table";
-import { receiverColumns } from "@/components/data-table/columns/receiver-columns";
+import { ReceiversTable } from "@/components/receivers/receivers-table";
 import { getReceivers } from "@/lib/api/receivers";
 
 export default async function ReceiversPage() {
@@ -25,12 +24,7 @@ export default async function ReceiversPage() {
           </Link>
         </Button>
       </div>
-      <DataTable
-        columns={receiverColumns}
-        data={receivers}
-        searchKey="name"
-        searchPlaceholder="Search receivers..."
-      />
+      <ReceiversTable receivers={receivers} />
     </div>
   );
 }

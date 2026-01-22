@@ -31,6 +31,8 @@ spec:
           env:
             - name: PORT
               value: "8080"
+            - name: CHROME_URL
+              value: "ws://localhost:9222"
           envFrom:
             - secretRef:
                 name: invoice-management-secrets
@@ -60,6 +62,26 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 5
             failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            capabilities:
+              drop:
+                - ALL
+        - name: headless-chrome
+          image: chromedp/headless-shell:latest
+          ports:
+            - containerPort: 9222
+              protocol: TCP
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

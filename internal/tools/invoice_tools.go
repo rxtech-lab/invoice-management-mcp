@@ -23,7 +23,7 @@ func NewCreateInvoiceTool(service services.InvoiceService) *CreateInvoiceTool {
 
 func (t *CreateInvoiceTool) GetTool() mcp.Tool {
 	return mcp.NewTool("create_invoice",
-		mcp.WithDescription("Create a new invoice. Note: amount is calculated from invoice items, use add_invoice_item to add items."),
+		mcp.WithDescription("Create a new invoice. Note: amount is calculated from invoice items, use add_invoice_item to add items. You can assign tags to categorize and label the invoice for better organization and filtering."),
 		mcp.WithString("title", mcp.Required(), mcp.Description("Invoice title")),
 		mcp.WithString("description", mcp.Description("Invoice description")),
 		mcp.WithNumber("receiver_id", mcp.Description("Receiver ID")),
@@ -35,6 +35,7 @@ func (t *CreateInvoiceTool) GetTool() mcp.Tool {
 		mcp.WithString("original_download_link", mcp.Description("Link to original invoice file")),
 		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue (default: paid). Please justify the status base on the pdf file and the invoice items.")),
 		mcp.WithString("due_date", mcp.Description("Due date (RFC3339)")),
+		mcp.WithArray("tags", mcp.Description("Tag names to assign to the invoice (e.g., ['travel', 'business', 'Q1-2024']). Tags will be created if they don't exist."), mcp.Items(map[string]any{"type": "string"})),
 	)
 }
 
@@ -85,6 +86,22 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 
 		if err := t.service.CreateInvoice(userID, invoice); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to create invoice: %v", err)), nil
+		}
+
+		// Set tags if provided
+		if tagsRaw, ok := args["tags"].([]interface{}); ok && len(tagsRaw) > 0 {
+			var tagNames []string
+			for _, v := range tagsRaw {
+				if name, ok := v.(string); ok && name != "" {
+					tagNames = append(tagNames, name)
+				}
+			}
+			if len(tagNames) > 0 {
+				if err := t.service.SetInvoiceTags(userID, invoice.ID, tagNames); err != nil {
+					// Log error but don't fail the entire operation
+					fmt.Printf("Warning: failed to set tags for invoice %d: %v\n", invoice.ID, err)
+				}
+			}
 		}
 
 		created, _ := t.service.GetInvoiceByID(userID, invoice.ID)
@@ -212,7 +229,7 @@ func NewUpdateInvoiceTool(service services.InvoiceService) *UpdateInvoiceTool {
 
 func (t *UpdateInvoiceTool) GetTool() mcp.Tool {
 	return mcp.NewTool("update_invoice",
-		mcp.WithDescription("Update an existing invoice. Note: amount is calculated from invoice items and cannot be set directly."),
+		mcp.WithDescription("Update an existing invoice. Note: amount is calculated from invoice items and cannot be set directly. You can update tags to re-categorize the invoice."),
 		mcp.WithNumber("invoice_id", mcp.Required(), mcp.Description("Invoice ID")),
 		mcp.WithString("title", mcp.Description("Invoice title")),
 		mcp.WithString("description", mcp.Description("Invoice description")),
@@ -223,6 +240,7 @@ func (t *UpdateInvoiceTool) GetTool() mcp.Tool {
 		mcp.WithString("original_download_link", mcp.Description("Link to original invoice file")),
 		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue")),
 		mcp.WithString("due_date", mcp.Description("Due date (RFC3339)")),
+		mcp.WithArray("tags", mcp.Description("Tag names to assign to the invoice (replaces existing tags). Pass empty array to remove all tags."), mcp.Items(map[string]any{"type": "string"})),
 	)
 }
 
@@ -265,6 +283,20 @@ func (t *UpdateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 
 		if err := t.service.UpdateInvoice(userID, invoice); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to update invoice: %v", err)), nil
+		}
+
+		// Update tags if provided
+		if tagsRaw, ok := args["tags"].([]interface{}); ok {
+			var tagNames []string
+			for _, v := range tagsRaw {
+				if name, ok := v.(string); ok && name != "" {
+					tagNames = append(tagNames, name)
+				}
+			}
+			// SetInvoiceTags handles empty array (removes all tags)
+			if err := t.service.SetInvoiceTags(userID, invoiceID, tagNames); err != nil {
+				fmt.Printf("Warning: failed to set tags for invoice %d: %v\n", invoiceID, err)
+			}
 		}
 
 		updated, _ := t.service.GetInvoiceByID(userID, invoiceID)

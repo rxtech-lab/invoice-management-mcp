@@ -33,11 +33,13 @@ func main() {
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
 	receiverService := services.NewReceiverService(db)
+	tagService := services.NewTagService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := initUploadService()
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
 	fileUnlinkService := initFileUnlinkService()
+	pdfService := initPDFService()
 
 	// Initialize MCP server
 	mcpSrv := mcpserver.NewMCPServer(
@@ -48,6 +50,7 @@ func main() {
 		invoiceService,
 		uploadService,
 		analyticsService,
+		tagService,
 	)
 
 	// Initialize API server
@@ -57,11 +60,13 @@ func main() {
 		categoryService,
 		companyService,
 		receiverService,
+		tagService,
 		invoiceService,
 		uploadService,
 		fileUploadService,
 		analyticsService,
 		fileUnlinkService,
+		pdfService,
 		mcpSrv.GetServer(),
 	)
 
@@ -169,4 +174,17 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func initPDFService() services.PDFService {
+	chromeURL := os.Getenv("CHROME_URL")
+	if chromeURL == "" {
+		log.Println("Warning: CHROME_URL not configured, HTML to PDF will not work")
+		return nil
+	}
+
+	log.Printf("PDF service initialized (Chrome URL: %s)", chromeURL)
+	return services.NewPDFService(services.PDFServiceConfig{
+		ChromeURL: chromeURL,
+	})
 }

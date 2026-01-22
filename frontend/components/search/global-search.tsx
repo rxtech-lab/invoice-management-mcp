@@ -12,8 +12,13 @@ import { keywordSearch } from "@/lib/search/keyword-search";
 import { InvoiceResult } from "./invoice-result";
 import { StatisticsRenderer } from "./statistics-renderer";
 import { InvoiceListRenderer } from "./invoice-list-renderer";
-import type { InvoiceSearchResult, InvoiceStatistics, DisplayInvoicesResult } from "@/lib/search/types";
+import type {
+  InvoiceSearchResult,
+  InvoiceStatistics,
+  DisplayInvoicesResult,
+} from "@/lib/search/types";
 import { Search, Loader2, FileText } from "lucide-react";
+import "@rx-lab/dashboard-searching-ui/style.css";
 
 // Helper to extract data from MCP tool result format
 // MCP tools return { content: [{ type: "text", text: "JSON string" }] }
@@ -27,7 +32,7 @@ function extractMCPToolData<T>(output: unknown): T | null {
     // Check if it's MCP format with content array
     if (Array.isArray(obj.content)) {
       const textContent = obj.content.find(
-        (c: { type?: string; text?: string }) => c.type === "text"
+        (c: { type?: string; text?: string }) => c.type === "text",
       );
       if (textContent?.text) {
         try {
@@ -49,14 +54,17 @@ function extractMCPToolData<T>(output: unknown): T | null {
 }
 
 // Wrapper for statistics renderer to match ToolResultRendererProps
-function StatisticsRendererWrapper({ output, onAction }: ToolResultRendererProps) {
+function StatisticsRendererWrapper({
+  output,
+  onAction,
+}: ToolResultRendererProps) {
   const handleAction = useCallback(
     (action: { type: string; path?: string; id?: number }) => {
       if (onAction) {
         onAction({ type: action.type, payload: action });
       }
     },
-    [onAction]
+    [onAction],
   );
 
   const data = extractMCPToolData<InvoiceStatistics>(output);
@@ -69,23 +77,21 @@ function StatisticsRendererWrapper({ output, onAction }: ToolResultRendererProps
     );
   }
 
-  return (
-    <StatisticsRenderer
-      output={data}
-      onAction={handleAction}
-    />
-  );
+  return <StatisticsRenderer output={data} onAction={handleAction} />;
 }
 
 // Wrapper for invoice list renderer to match ToolResultRendererProps
-function InvoiceListRendererWrapper({ output, onAction }: ToolResultRendererProps) {
+function InvoiceListRendererWrapper({
+  output,
+  onAction,
+}: ToolResultRendererProps) {
   const handleAction = useCallback(
     (action: { type: string; path?: string; id?: number }) => {
       if (onAction) {
         onAction({ type: action.type, payload: action });
       }
     },
-    [onAction]
+    [onAction],
   );
 
   const data = extractMCPToolData<DisplayInvoicesResult>(output);
@@ -98,12 +104,7 @@ function InvoiceListRendererWrapper({ output, onAction }: ToolResultRendererProp
     );
   }
 
-  return (
-    <InvoiceListRenderer
-      output={data}
-      onAction={handleAction}
-    />
-  );
+  return <InvoiceListRenderer output={data} onAction={handleAction} />;
 }
 
 export function GlobalSearch() {
@@ -130,7 +131,7 @@ export function GlobalSearch() {
     }): Promise<InvoiceSearchResult[]> => {
       return keywordSearch({ query: params.query, limit: params.limit });
     },
-    []
+    [],
   );
 
   // Handle result selection
@@ -139,7 +140,7 @@ export function GlobalSearch() {
       setOpen(false);
       router.push(`/invoices/${result.id}`);
     },
-    [router]
+    [router],
   );
 
   // Handle tool actions from AI agent
@@ -165,7 +166,7 @@ export function GlobalSearch() {
           break;
       }
     },
-    [router]
+    [router],
   );
 
   // Custom result renderer
@@ -173,7 +174,7 @@ export function GlobalSearch() {
     (result: InvoiceSearchResult, onSelect: () => void) => (
       <InvoiceResult key={result.id} invoice={result} onSelect={onSelect} />
     ),
-    []
+    [],
   );
 
   // Empty state renderer
@@ -196,7 +197,7 @@ export function GlobalSearch() {
         <p>Searching invoices...</p>
       </div>
     ),
-    []
+    [],
   );
 
   return (

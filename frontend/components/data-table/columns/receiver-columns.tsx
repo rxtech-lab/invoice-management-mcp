@@ -11,14 +11,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Pencil, Trash, ArrowUpDown, User, Building2 } from "lucide-react";
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash,
+  ArrowUpDown,
+  User,
+  Building2,
+  GitMerge,
+} from "lucide-react";
 import { Receiver } from "@/lib/api/types";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { deleteReceiverAction } from "@/lib/actions/receiver-actions";
 import { toast } from "sonner";
+import { MergeReceiversDialog } from "@/components/receivers/merge-receivers-dialog";
 
-export const receiverColumns: ColumnDef<Receiver>[] = [
+export function createReceiverColumns(
+  allReceivers: Receiver[]
+): ColumnDef<Receiver>[] {
+  return [
   {
     accessorKey: "name",
     header: ({ column }) => (
@@ -75,47 +87,60 @@ export const receiverColumns: ColumnDef<Receiver>[] = [
     cell: ({ row }) => formatDate(row.original.created_at),
   },
   {
-    id: "actions",
-    cell: ({ row }) => {
-      const receiver = row.original;
+      id: "actions",
+      cell: ({ row }) => {
+        const receiver = row.original;
 
-      const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this receiver?")) return;
-        const result = await deleteReceiverAction(receiver.id);
-        if (result.success) {
-          toast.success("Receiver deleted");
-        } else {
-          toast.error(result.error || "Failed to delete receiver");
-        }
-      };
+        const handleDelete = async () => {
+          if (!confirm("Are you sure you want to delete this receiver?"))
+            return;
+          const result = await deleteReceiverAction(receiver.id);
+          if (result.success) {
+            toast.success("Receiver deleted");
+          } else {
+            toast.error(result.error || "Failed to delete receiver");
+          }
+        };
 
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link href={`/receivers/${receiver.id}`}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleDelete}
-              className="text-destructive"
-            >
-              <Trash className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <Link href={`/receivers/${receiver.id}`}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              {allReceivers.length > 1 && (
+                <MergeReceiversDialog
+                  targetReceiver={receiver}
+                  allReceivers={allReceivers}
+                >
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <GitMerge className="mr-2 h-4 w-4" />
+                    Merge into this
+                  </DropdownMenuItem>
+                </MergeReceiversDialog>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleDelete}
+                className="text-destructive"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
-  },
-];
+  ];
+}

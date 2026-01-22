@@ -12,6 +12,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   MoreHorizontal,
   Pencil,
   Trash,
@@ -49,14 +54,49 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => (
-      <Link
-        href={`/invoices/${row.original.id}`}
-        className="font-medium hover:underline"
-      >
-        {row.original.title}
-      </Link>
-    ),
+    cell: ({ row }) => {
+      const tags = row.original.tags;
+      const hasTags = tags && tags.length > 0;
+
+      const titleLink = (
+        <Link
+          href={`/invoices/${row.original.id}`}
+          className="font-medium hover:underline"
+        >
+          {row.original.title}
+        </Link>
+      );
+
+      if (!hasTags) {
+        return titleLink;
+      }
+
+      return (
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>{titleLink}</TooltipTrigger>
+          <TooltipContent className="pointer-events-none">
+            <div className="flex flex-wrap gap-1">
+              {tags.map((tag, index) => (
+                <span
+                  key={`tag-${tag.id ?? index}`}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
+                  style={{
+                    backgroundColor: tag.color ? `${tag.color}20` : "#6B728020",
+                    color: tag.color || "#6B7280",
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: tag.color || "#6B7280" }}
+                  />
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      );
+    },
   },
   {
     accessorKey: "company",

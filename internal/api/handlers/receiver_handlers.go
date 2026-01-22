@@ -124,3 +124,43 @@ func (h *StrictHandlers) DeleteReceiver(
 
 	return generated.DeleteReceiver204Response{}, nil
 }
+
+// MergeReceivers implements generated.StrictServerInterface
+func (h *StrictHandlers) MergeReceivers(
+	ctx context.Context,
+	request generated.MergeReceiversRequestObject,
+) (generated.MergeReceiversResponseObject, error) {
+	userID, err := getUserID(ctx)
+	if err != nil {
+		return generated.MergeReceivers401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
+	}
+
+	if request.Body == nil {
+		return generated.MergeReceivers400JSONResponse{BadRequestJSONResponse: badRequest("Request body is required")}, nil
+	}
+
+	if request.Body.TargetId == 0 {
+		return generated.MergeReceivers400JSONResponse{BadRequestJSONResponse: badRequest("Target ID is required")}, nil
+	}
+
+	if len(request.Body.SourceIds) == 0 {
+		return generated.MergeReceivers400JSONResponse{BadRequestJSONResponse: badRequest("Source IDs are required")}, nil
+	}
+
+	// Convert source IDs to uint
+	sourceIDs := make([]uint, len(request.Body.SourceIds))
+	for i, id := range request.Body.SourceIds {
+		sourceIDs[i] = uint(id)
+	}
+
+	receiver, affectedCount, err := h.receiverService.MergeReceivers(userID, uint(request.Body.TargetId), sourceIDs)
+	if err != nil {
+		return generated.MergeReceivers404JSONResponse{NotFoundJSONResponse: notFound(err.Error())}, nil
+	}
+
+	return generated.MergeReceivers200JSONResponse{
+		Receiver:        ptr(receiverModelToGenerated(receiver)),
+		MergedCount:     ptr(len(sourceIDs)),
+		InvoicesUpdated: ptr(int(affectedCount)),
+	}, nil
+}

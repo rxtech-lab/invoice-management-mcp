@@ -98,6 +98,9 @@ type ClientInterface interface {
 	// GetAnalyticsByReceiver request
 	GetAnalyticsByReceiver(ctx context.Context, params *GetAnalyticsByReceiverParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAnalyticsByTag request
+	GetAnalyticsByTag(ctx context.Context, params *GetAnalyticsByTagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetAnalyticsSummary request
 	GetAnalyticsSummary(ctx context.Context, params *GetAnalyticsSummaryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -171,6 +174,14 @@ type ClientInterface interface {
 
 	UpdateInvoiceStatus(ctx context.Context, id InvoiceId, body UpdateInvoiceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AddTagToInvoiceWithBody request with any body
+	AddTagToInvoiceWithBody(ctx context.Context, id InvoiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AddTagToInvoice(ctx context.Context, id InvoiceId, body AddTagToInvoiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveTagFromInvoice request
+	RemoveTagFromInvoice(ctx context.Context, id InvoiceId, tagId int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteInvoiceItem request
 	DeleteInvoiceItem(ctx context.Context, invoiceId int, itemId int, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -187,6 +198,11 @@ type ClientInterface interface {
 
 	CreateReceiver(ctx context.Context, body CreateReceiverJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// MergeReceiversWithBody request with any body
+	MergeReceiversWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MergeReceivers(ctx context.Context, body MergeReceiversJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteReceiver request
 	DeleteReceiver(ctx context.Context, id ReceiverId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -198,8 +214,32 @@ type ClientInterface interface {
 
 	UpdateReceiver(ctx context.Context, id ReceiverId, body UpdateReceiverJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListTags request
+	ListTags(ctx context.Context, params *ListTagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTagWithBody request with any body
+	CreateTagWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateTag(ctx context.Context, body CreateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTag request
+	DeleteTag(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTag request
+	GetTag(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTagWithBody request with any body
+	UpdateTagWithBody(ctx context.Context, id TagId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateTag(ctx context.Context, id TagId, body UpdateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadFileWithBody request with any body
 	UploadFileWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadHtmlToPdfWithBody request with any body
+	UploadHtmlToPdfWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UploadHtmlToPdf(ctx context.Context, body UploadHtmlToPdfJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPresignedURL request
 	GetPresignedURL(ctx context.Context, params *GetPresignedURLParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -234,6 +274,18 @@ func (c *Client) GetAnalyticsByCompany(ctx context.Context, params *GetAnalytics
 
 func (c *Client) GetAnalyticsByReceiver(ctx context.Context, params *GetAnalyticsByReceiverParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAnalyticsByReceiverRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAnalyticsByTag(ctx context.Context, params *GetAnalyticsByTagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAnalyticsByTagRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -568,6 +620,42 @@ func (c *Client) UpdateInvoiceStatus(ctx context.Context, id InvoiceId, body Upd
 	return c.Client.Do(req)
 }
 
+func (c *Client) AddTagToInvoiceWithBody(ctx context.Context, id InvoiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTagToInvoiceRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AddTagToInvoice(ctx context.Context, id InvoiceId, body AddTagToInvoiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTagToInvoiceRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RemoveTagFromInvoice(ctx context.Context, id InvoiceId, tagId int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveTagFromInvoiceRequest(c.Server, id, tagId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) DeleteInvoiceItem(ctx context.Context, invoiceId int, itemId int, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteInvoiceItemRequest(c.Server, invoiceId, itemId)
 	if err != nil {
@@ -640,6 +728,30 @@ func (c *Client) CreateReceiver(ctx context.Context, body CreateReceiverJSONRequ
 	return c.Client.Do(req)
 }
 
+func (c *Client) MergeReceiversWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMergeReceiversRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MergeReceivers(ctx context.Context, body MergeReceiversJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMergeReceiversRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) DeleteReceiver(ctx context.Context, id ReceiverId, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteReceiverRequest(c.Server, id)
 	if err != nil {
@@ -688,8 +800,116 @@ func (c *Client) UpdateReceiver(ctx context.Context, id ReceiverId, body UpdateR
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListTags(ctx context.Context, params *ListTagsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListTagsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateTagWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTagRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateTag(ctx context.Context, body CreateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTagRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteTag(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTagRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetTag(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTagRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateTagWithBody(ctx context.Context, id TagId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTagRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateTag(ctx context.Context, id TagId, body UpdateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTagRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) UploadFileWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadFileRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadHtmlToPdfWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadHtmlToPdfRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadHtmlToPdf(ctx context.Context, body UploadHtmlToPdfJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadHtmlToPdfRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -832,6 +1052,55 @@ func NewGetAnalyticsByReceiverRequest(server string, params *GetAnalyticsByRecei
 	}
 
 	operationPath := fmt.Sprintf("/api/analytics/by-receiver")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Period != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "period", runtime.ParamLocationQuery, *params.Period); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAnalyticsByTagRequest generates requests for GetAnalyticsByTag
+func NewGetAnalyticsByTagRequest(server string, params *GetAnalyticsByTagParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/analytics/by-tag")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1512,6 +1781,22 @@ func NewListInvoicesRequest(server string, params *ListInvoicesParams) (*http.Re
 
 		}
 
+		if params.TagIds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tag_ids", runtime.ParamLocationQuery, *params.TagIds); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.Status != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "status", runtime.ParamLocationQuery, *params.Status); err != nil {
@@ -1852,6 +2137,94 @@ func NewUpdateInvoiceStatusRequestWithBody(server string, id InvoiceId, contentT
 	return req, nil
 }
 
+// NewAddTagToInvoiceRequest calls the generic AddTagToInvoice builder with application/json body
+func NewAddTagToInvoiceRequest(server string, id InvoiceId, body AddTagToInvoiceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAddTagToInvoiceRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewAddTagToInvoiceRequestWithBody generates requests for AddTagToInvoice with any type of body
+func NewAddTagToInvoiceRequestWithBody(server string, id InvoiceId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/invoices/%s/tags", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRemoveTagFromInvoiceRequest generates requests for RemoveTagFromInvoice
+func NewRemoveTagFromInvoiceRequest(server string, id InvoiceId, tagId int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "tagId", runtime.ParamLocationPath, tagId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/invoices/%s/tags/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteInvoiceItemRequest generates requests for DeleteInvoiceItem
 func NewDeleteInvoiceItemRequest(server string, invoiceId int, itemId int) (*http.Request, error) {
 	var err error
@@ -2068,6 +2441,46 @@ func NewCreateReceiverRequestWithBody(server string, contentType string, body io
 	return req, nil
 }
 
+// NewMergeReceiversRequest calls the generic MergeReceivers builder with application/json body
+func NewMergeReceiversRequest(server string, body MergeReceiversJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMergeReceiversRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewMergeReceiversRequestWithBody generates requests for MergeReceivers with any type of body
+func NewMergeReceiversRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/receivers/merge")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteReceiverRequest generates requests for DeleteReceiver
 func NewDeleteReceiverRequest(server string, id ReceiverId) (*http.Request, error) {
 	var err error
@@ -2183,6 +2596,242 @@ func NewUpdateReceiverRequestWithBody(server string, id ReceiverId, contentType 
 	return req, nil
 }
 
+// NewListTagsRequest generates requests for ListTags
+func NewListTagsRequest(server string, params *ListTagsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/tags")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Keyword != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "keyword", runtime.ParamLocationQuery, *params.Keyword); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateTagRequest calls the generic CreateTag builder with application/json body
+func NewCreateTagRequest(server string, body CreateTagJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateTagRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateTagRequestWithBody generates requests for CreateTag with any type of body
+func NewCreateTagRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/tags")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteTagRequest generates requests for DeleteTag
+func NewDeleteTagRequest(server string, id TagId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/tags/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetTagRequest generates requests for GetTag
+func NewGetTagRequest(server string, id TagId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/tags/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateTagRequest calls the generic UpdateTag builder with application/json body
+func NewUpdateTagRequest(server string, id TagId, body UpdateTagJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTagRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateTagRequestWithBody generates requests for UpdateTag with any type of body
+func NewUpdateTagRequestWithBody(server string, id TagId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/tags/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUploadFileRequestWithBody generates requests for UploadFile with any type of body
 func NewUploadFileRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -2193,6 +2842,46 @@ func NewUploadFileRequestWithBody(server string, contentType string, body io.Rea
 	}
 
 	operationPath := fmt.Sprintf("/api/upload")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUploadHtmlToPdfRequest calls the generic UploadHtmlToPdf builder with application/json body
+func NewUploadHtmlToPdfRequest(server string, body UploadHtmlToPdfJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUploadHtmlToPdfRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUploadHtmlToPdfRequestWithBody generates requests for UploadHtmlToPdf with any type of body
+func NewUploadHtmlToPdfRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/upload/html-to-pdf")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2352,6 +3041,9 @@ type ClientWithResponsesInterface interface {
 	// GetAnalyticsByReceiverWithResponse request
 	GetAnalyticsByReceiverWithResponse(ctx context.Context, params *GetAnalyticsByReceiverParams, reqEditors ...RequestEditorFn) (*GetAnalyticsByReceiverResponse, error)
 
+	// GetAnalyticsByTagWithResponse request
+	GetAnalyticsByTagWithResponse(ctx context.Context, params *GetAnalyticsByTagParams, reqEditors ...RequestEditorFn) (*GetAnalyticsByTagResponse, error)
+
 	// GetAnalyticsSummaryWithResponse request
 	GetAnalyticsSummaryWithResponse(ctx context.Context, params *GetAnalyticsSummaryParams, reqEditors ...RequestEditorFn) (*GetAnalyticsSummaryResponse, error)
 
@@ -2425,6 +3117,14 @@ type ClientWithResponsesInterface interface {
 
 	UpdateInvoiceStatusWithResponse(ctx context.Context, id InvoiceId, body UpdateInvoiceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInvoiceStatusResponse, error)
 
+	// AddTagToInvoiceWithBodyWithResponse request with any body
+	AddTagToInvoiceWithBodyWithResponse(ctx context.Context, id InvoiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTagToInvoiceResponse, error)
+
+	AddTagToInvoiceWithResponse(ctx context.Context, id InvoiceId, body AddTagToInvoiceJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTagToInvoiceResponse, error)
+
+	// RemoveTagFromInvoiceWithResponse request
+	RemoveTagFromInvoiceWithResponse(ctx context.Context, id InvoiceId, tagId int, reqEditors ...RequestEditorFn) (*RemoveTagFromInvoiceResponse, error)
+
 	// DeleteInvoiceItemWithResponse request
 	DeleteInvoiceItemWithResponse(ctx context.Context, invoiceId int, itemId int, reqEditors ...RequestEditorFn) (*DeleteInvoiceItemResponse, error)
 
@@ -2441,6 +3141,11 @@ type ClientWithResponsesInterface interface {
 
 	CreateReceiverWithResponse(ctx context.Context, body CreateReceiverJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateReceiverResponse, error)
 
+	// MergeReceiversWithBodyWithResponse request with any body
+	MergeReceiversWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MergeReceiversResponse, error)
+
+	MergeReceiversWithResponse(ctx context.Context, body MergeReceiversJSONRequestBody, reqEditors ...RequestEditorFn) (*MergeReceiversResponse, error)
+
 	// DeleteReceiverWithResponse request
 	DeleteReceiverWithResponse(ctx context.Context, id ReceiverId, reqEditors ...RequestEditorFn) (*DeleteReceiverResponse, error)
 
@@ -2452,8 +3157,32 @@ type ClientWithResponsesInterface interface {
 
 	UpdateReceiverWithResponse(ctx context.Context, id ReceiverId, body UpdateReceiverJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateReceiverResponse, error)
 
+	// ListTagsWithResponse request
+	ListTagsWithResponse(ctx context.Context, params *ListTagsParams, reqEditors ...RequestEditorFn) (*ListTagsResponse, error)
+
+	// CreateTagWithBodyWithResponse request with any body
+	CreateTagWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTagResponse, error)
+
+	CreateTagWithResponse(ctx context.Context, body CreateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTagResponse, error)
+
+	// DeleteTagWithResponse request
+	DeleteTagWithResponse(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*DeleteTagResponse, error)
+
+	// GetTagWithResponse request
+	GetTagWithResponse(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*GetTagResponse, error)
+
+	// UpdateTagWithBodyWithResponse request with any body
+	UpdateTagWithBodyWithResponse(ctx context.Context, id TagId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTagResponse, error)
+
+	UpdateTagWithResponse(ctx context.Context, id TagId, body UpdateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTagResponse, error)
+
 	// UploadFileWithBodyWithResponse request with any body
 	UploadFileWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadFileResponse, error)
+
+	// UploadHtmlToPdfWithBodyWithResponse request with any body
+	UploadHtmlToPdfWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadHtmlToPdfResponse, error)
+
+	UploadHtmlToPdfWithResponse(ctx context.Context, body UploadHtmlToPdfJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadHtmlToPdfResponse, error)
 
 	// GetPresignedURLWithResponse request
 	GetPresignedURLWithResponse(ctx context.Context, params *GetPresignedURLParams, reqEditors ...RequestEditorFn) (*GetPresignedURLResponse, error)
@@ -2525,6 +3254,29 @@ func (r GetAnalyticsByReceiverResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetAnalyticsByReceiverResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetAnalyticsByTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AnalyticsByGroup
+	JSON401      *Unauthorized
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAnalyticsByTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAnalyticsByTagResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2981,6 +3733,55 @@ func (r UpdateInvoiceStatusResponse) StatusCode() int {
 	return 0
 }
 
+type AddTagToInvoiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Invoice
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r AddTagToInvoiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AddTagToInvoiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RemoveTagFromInvoiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Invoice
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveTagFromInvoiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveTagFromInvoiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type DeleteInvoiceItemResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3074,6 +3875,31 @@ func (r CreateReceiverResponse) StatusCode() int {
 	return 0
 }
 
+type MergeReceiversResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MergeReceiversResult
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r MergeReceiversResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MergeReceiversResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type DeleteReceiverResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3145,6 +3971,124 @@ func (r UpdateReceiverResponse) StatusCode() int {
 	return 0
 }
 
+type ListTagsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TagListResponse
+	JSON401      *Unauthorized
+}
+
+// Status returns HTTPResponse.Status
+func (r ListTagsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListTagsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *Tag
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateTagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Tag
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Tag
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadFileResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3163,6 +4107,31 @@ func (r UploadFileResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UploadFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadHtmlToPdfResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *UploadResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadHtmlToPdfResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadHtmlToPdfResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3242,6 +4211,15 @@ func (c *ClientWithResponses) GetAnalyticsByReceiverWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseGetAnalyticsByReceiverResponse(rsp)
+}
+
+// GetAnalyticsByTagWithResponse request returning *GetAnalyticsByTagResponse
+func (c *ClientWithResponses) GetAnalyticsByTagWithResponse(ctx context.Context, params *GetAnalyticsByTagParams, reqEditors ...RequestEditorFn) (*GetAnalyticsByTagResponse, error) {
+	rsp, err := c.GetAnalyticsByTag(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAnalyticsByTagResponse(rsp)
 }
 
 // GetAnalyticsSummaryWithResponse request returning *GetAnalyticsSummaryResponse
@@ -3479,6 +4457,32 @@ func (c *ClientWithResponses) UpdateInvoiceStatusWithResponse(ctx context.Contex
 	return ParseUpdateInvoiceStatusResponse(rsp)
 }
 
+// AddTagToInvoiceWithBodyWithResponse request with arbitrary body returning *AddTagToInvoiceResponse
+func (c *ClientWithResponses) AddTagToInvoiceWithBodyWithResponse(ctx context.Context, id InvoiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTagToInvoiceResponse, error) {
+	rsp, err := c.AddTagToInvoiceWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddTagToInvoiceResponse(rsp)
+}
+
+func (c *ClientWithResponses) AddTagToInvoiceWithResponse(ctx context.Context, id InvoiceId, body AddTagToInvoiceJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTagToInvoiceResponse, error) {
+	rsp, err := c.AddTagToInvoice(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddTagToInvoiceResponse(rsp)
+}
+
+// RemoveTagFromInvoiceWithResponse request returning *RemoveTagFromInvoiceResponse
+func (c *ClientWithResponses) RemoveTagFromInvoiceWithResponse(ctx context.Context, id InvoiceId, tagId int, reqEditors ...RequestEditorFn) (*RemoveTagFromInvoiceResponse, error) {
+	rsp, err := c.RemoveTagFromInvoice(ctx, id, tagId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveTagFromInvoiceResponse(rsp)
+}
+
 // DeleteInvoiceItemWithResponse request returning *DeleteInvoiceItemResponse
 func (c *ClientWithResponses) DeleteInvoiceItemWithResponse(ctx context.Context, invoiceId int, itemId int, reqEditors ...RequestEditorFn) (*DeleteInvoiceItemResponse, error) {
 	rsp, err := c.DeleteInvoiceItem(ctx, invoiceId, itemId, reqEditors...)
@@ -3531,6 +4535,23 @@ func (c *ClientWithResponses) CreateReceiverWithResponse(ctx context.Context, bo
 	return ParseCreateReceiverResponse(rsp)
 }
 
+// MergeReceiversWithBodyWithResponse request with arbitrary body returning *MergeReceiversResponse
+func (c *ClientWithResponses) MergeReceiversWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MergeReceiversResponse, error) {
+	rsp, err := c.MergeReceiversWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMergeReceiversResponse(rsp)
+}
+
+func (c *ClientWithResponses) MergeReceiversWithResponse(ctx context.Context, body MergeReceiversJSONRequestBody, reqEditors ...RequestEditorFn) (*MergeReceiversResponse, error) {
+	rsp, err := c.MergeReceivers(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMergeReceiversResponse(rsp)
+}
+
 // DeleteReceiverWithResponse request returning *DeleteReceiverResponse
 func (c *ClientWithResponses) DeleteReceiverWithResponse(ctx context.Context, id ReceiverId, reqEditors ...RequestEditorFn) (*DeleteReceiverResponse, error) {
 	rsp, err := c.DeleteReceiver(ctx, id, reqEditors...)
@@ -3566,6 +4587,67 @@ func (c *ClientWithResponses) UpdateReceiverWithResponse(ctx context.Context, id
 	return ParseUpdateReceiverResponse(rsp)
 }
 
+// ListTagsWithResponse request returning *ListTagsResponse
+func (c *ClientWithResponses) ListTagsWithResponse(ctx context.Context, params *ListTagsParams, reqEditors ...RequestEditorFn) (*ListTagsResponse, error) {
+	rsp, err := c.ListTags(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListTagsResponse(rsp)
+}
+
+// CreateTagWithBodyWithResponse request with arbitrary body returning *CreateTagResponse
+func (c *ClientWithResponses) CreateTagWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTagResponse, error) {
+	rsp, err := c.CreateTagWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTagResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateTagWithResponse(ctx context.Context, body CreateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTagResponse, error) {
+	rsp, err := c.CreateTag(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTagResponse(rsp)
+}
+
+// DeleteTagWithResponse request returning *DeleteTagResponse
+func (c *ClientWithResponses) DeleteTagWithResponse(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*DeleteTagResponse, error) {
+	rsp, err := c.DeleteTag(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTagResponse(rsp)
+}
+
+// GetTagWithResponse request returning *GetTagResponse
+func (c *ClientWithResponses) GetTagWithResponse(ctx context.Context, id TagId, reqEditors ...RequestEditorFn) (*GetTagResponse, error) {
+	rsp, err := c.GetTag(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTagResponse(rsp)
+}
+
+// UpdateTagWithBodyWithResponse request with arbitrary body returning *UpdateTagResponse
+func (c *ClientWithResponses) UpdateTagWithBodyWithResponse(ctx context.Context, id TagId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTagResponse, error) {
+	rsp, err := c.UpdateTagWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTagResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateTagWithResponse(ctx context.Context, id TagId, body UpdateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTagResponse, error) {
+	rsp, err := c.UpdateTag(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTagResponse(rsp)
+}
+
 // UploadFileWithBodyWithResponse request with arbitrary body returning *UploadFileResponse
 func (c *ClientWithResponses) UploadFileWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadFileResponse, error) {
 	rsp, err := c.UploadFileWithBody(ctx, contentType, body, reqEditors...)
@@ -3573,6 +4655,23 @@ func (c *ClientWithResponses) UploadFileWithBodyWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseUploadFileResponse(rsp)
+}
+
+// UploadHtmlToPdfWithBodyWithResponse request with arbitrary body returning *UploadHtmlToPdfResponse
+func (c *ClientWithResponses) UploadHtmlToPdfWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadHtmlToPdfResponse, error) {
+	rsp, err := c.UploadHtmlToPdfWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadHtmlToPdfResponse(rsp)
+}
+
+func (c *ClientWithResponses) UploadHtmlToPdfWithResponse(ctx context.Context, body UploadHtmlToPdfJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadHtmlToPdfResponse, error) {
+	rsp, err := c.UploadHtmlToPdf(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadHtmlToPdfResponse(rsp)
 }
 
 // GetPresignedURLWithResponse request returning *GetPresignedURLResponse
@@ -3668,6 +4767,39 @@ func ParseGetAnalyticsByReceiverResponse(rsp *http.Response) (*GetAnalyticsByRec
 	}
 
 	response := &GetAnalyticsByReceiverResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AnalyticsByGroup
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAnalyticsByTagResponse parses an HTTP response from a GetAnalyticsByTagWithResponse call
+func ParseGetAnalyticsByTagResponse(rsp *http.Response) (*GetAnalyticsByTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAnalyticsByTagResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4410,6 +5542,93 @@ func ParseUpdateInvoiceStatusResponse(rsp *http.Response) (*UpdateInvoiceStatusR
 	return response, nil
 }
 
+// ParseAddTagToInvoiceResponse parses an HTTP response from a AddTagToInvoiceWithResponse call
+func ParseAddTagToInvoiceResponse(rsp *http.Response) (*AddTagToInvoiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AddTagToInvoiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Invoice
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveTagFromInvoiceResponse parses an HTTP response from a RemoveTagFromInvoiceWithResponse call
+func ParseRemoveTagFromInvoiceResponse(rsp *http.Response) (*RemoveTagFromInvoiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveTagFromInvoiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Invoice
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDeleteInvoiceItemResponse parses an HTTP response from a DeleteInvoiceItemWithResponse call
 func ParseDeleteInvoiceItemResponse(rsp *http.Response) (*DeleteInvoiceItemResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4549,6 +5768,53 @@ func ParseCreateReceiverResponse(rsp *http.Response) (*CreateReceiverResponse, e
 	return response, nil
 }
 
+// ParseMergeReceiversResponse parses an HTTP response from a MergeReceiversWithResponse call
+func ParseMergeReceiversResponse(rsp *http.Response) (*MergeReceiversResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MergeReceiversResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MergeReceiversResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDeleteReceiverResponse parses an HTTP response from a DeleteReceiverWithResponse call
 func ParseDeleteReceiverResponse(rsp *http.Response) (*DeleteReceiverResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4662,6 +5928,192 @@ func ParseUpdateReceiverResponse(rsp *http.Response) (*UpdateReceiverResponse, e
 	return response, nil
 }
 
+// ParseListTagsResponse parses an HTTP response from a ListTagsWithResponse call
+func ParseListTagsResponse(rsp *http.Response) (*ListTagsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListTagsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TagListResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateTagResponse parses an HTTP response from a CreateTagWithResponse call
+func ParseCreateTagResponse(rsp *http.Response) (*CreateTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateTagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Tag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTagResponse parses an HTTP response from a DeleteTagWithResponse call
+func ParseDeleteTagResponse(rsp *http.Response) (*DeleteTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTagResponse parses an HTTP response from a GetTagWithResponse call
+func ParseGetTagResponse(rsp *http.Response) (*GetTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Tag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateTagResponse parses an HTTP response from a UpdateTagWithResponse call
+func ParseUpdateTagResponse(rsp *http.Response) (*UpdateTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Tag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseUploadFileResponse parses an HTTP response from a UploadFileWithResponse call
 func ParseUploadFileResponse(rsp *http.Response) (*UploadFileResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4696,6 +6148,53 @@ func ParseUploadFileResponse(rsp *http.Response) (*UploadFileResponse, error) {
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUploadHtmlToPdfResponse parses an HTTP response from a UploadHtmlToPdfWithResponse call
+func ParseUploadHtmlToPdfResponse(rsp *http.Response) (*UploadHtmlToPdfResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadHtmlToPdfResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UploadResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 

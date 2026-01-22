@@ -57,6 +57,9 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
   const chartData = useMemo(() => {
     const now = new Date();
 
+    // Helper to get invoice date (due_date with created_at fallback)
+    const getInvoiceDate = (inv: Invoice) => parseISO(inv.due_date || inv.created_at);
+
     if (period === "7d") {
       // Last 7 days - daily breakdown
       const start = subDays(now, 6);
@@ -64,7 +67,7 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
 
       return days.map((day) => {
         const dayInvoices = invoices.filter((inv) => {
-          const invDate = parseISO(inv.created_at);
+          const invDate = getInvoiceDate(inv);
           return isSameDay(invDate, day);
         });
 
@@ -86,7 +89,7 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
 
       return days.map((day) => {
         const dayInvoices = invoices.filter((inv) => {
-          const invDate = parseISO(inv.created_at);
+          const invDate = getInvoiceDate(inv);
           return isSameDay(invDate, day);
         });
 
@@ -108,7 +111,7 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
 
       return months.map((month) => {
         const monthInvoices = invoices.filter((inv) => {
-          const invDate = parseISO(inv.created_at);
+          const invDate = getInvoiceDate(inv);
           return isSameMonth(invDate, month);
         });
 

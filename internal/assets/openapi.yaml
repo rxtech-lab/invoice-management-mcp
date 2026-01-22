@@ -18,6 +18,8 @@ tags:
     description: Company/vendor management
   - name: Receivers
     description: Invoice receiver management
+  - name: Tags
+    description: Invoice tag management
   - name: Invoices
     description: Invoice management
   - name: Invoice Items
@@ -386,6 +388,207 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/receivers/merge:
+    post:
+      tags:
+        - Receivers
+      summary: Merge receivers
+      description: Merge multiple receivers into one. All invoices from source receivers will be reassigned to the target receiver.
+      operationId: mergeReceivers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeReceiversRequest'
+      responses:
+        '200':
+          description: Receivers merged successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeReceiversResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/tags:
+    get:
+      tags:
+        - Tags
+      summary: List tags
+      description: Returns a paginated list of tags with optional search
+      operationId: listTags
+      parameters:
+        - name: keyword
+          in: query
+          description: Search keyword for tag name
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Tags
+      summary: Create tag
+      description: Creates a new invoice tag
+      operationId: createTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTagRequest'
+      responses:
+        '201':
+          description: Tag created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/tags/{id}:
+    get:
+      tags:
+        - Tags
+      summary: Get tag
+      description: Returns a tag by ID
+      operationId: getTag
+      parameters:
+        - $ref: '#/components/parameters/TagId'
+      responses:
+        '200':
+          description: Tag details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Tags
+      summary: Update tag
+      description: Updates an existing tag
+      operationId: updateTag
+      parameters:
+        - $ref: '#/components/parameters/TagId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTagRequest'
+      responses:
+        '200':
+          description: Tag updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - Tags
+      summary: Delete tag
+      description: Deletes a tag and removes it from all invoices
+      operationId: deleteTag
+      parameters:
+        - $ref: '#/components/parameters/TagId'
+      responses:
+        '204':
+          description: Tag deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/invoices/{id}/tags:
+    post:
+      tags:
+        - Tags
+      summary: Add tag to invoice
+      description: Adds a tag to an invoice
+      operationId: addTagToInvoice
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tag_id
+              properties:
+                tag_id:
+                  type: integer
+                  description: Tag ID to add
+      responses:
+        '200':
+          description: Tag added to invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/invoices/{id}/tags/{tagId}:
+    delete:
+      tags:
+        - Tags
+      summary: Remove tag from invoice
+      description: Removes a tag from an invoice
+      operationId: removeTagFromInvoice
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+        - name: tagId
+          in: path
+          required: true
+          description: Tag ID to remove
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tag removed from invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/invoices:
     get:
       tags:
@@ -414,6 +617,12 @@ paths:
           description: Filter by receiver ID
           schema:
             type: integer
+        - name: tag_ids
+          in: query
+          description: Filter by tag IDs (comma-separated)
+          schema:
+            type: string
+          example: "1,2,3"
         - name: status
           in: query
           description: Filter by invoice status
@@ -713,6 +922,37 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/upload/html-to-pdf:
+    post:
+      tags:
+        - Upload
+      summary: Convert HTML to PDF and upload
+      description: Accepts HTML content, sanitizes it, converts to PDF using headless Chrome, and uploads to S3-compatible storage
+      operationId: uploadHtmlToPdf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HtmlToPdfRequest'
+      responses:
+        '201':
+          description: PDF generated and uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: PDF conversion failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/files/{key}/download:
     get:
       tags:
@@ -845,6 +1085,31 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/analytics/by-tag:
+    get:
+      tags:
+        - Analytics
+      summary: Get invoice analytics grouped by tag
+      description: Returns invoice amounts grouped by tag for a time period
+      operationId: getAnalyticsByTag
+      parameters:
+        - name: period
+          in: query
+          description: Time period for analytics
+          schema:
+            type: string
+            enum: [7d, 1m, 1y]
+            default: 1m
+      responses:
+        '200':
+          description: Analytics by tag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsByGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -905,6 +1170,14 @@ components:
       in: path
       required: true
       description: Receiver ID
+      schema:
+        type: integer
+
+    TagId:
+      name: id
+      in: path
+      required: true
+      description: Tag ID
       schema:
         type: integer
 
@@ -1189,6 +1462,109 @@ components:
         offset:
           type: integer
 
+    MergeReceiversRequest:
+      type: object
+      required:
+        - target_id
+        - source_ids
+      properties:
+        target_id:
+          type: integer
+          description: ID of the receiver to keep (all invoices will be moved to this receiver)
+        source_ids:
+          type: array
+          items:
+            type: integer
+          description: IDs of receivers to merge into the target (these receivers will be deleted)
+          minItems: 1
+
+    MergeReceiversResult:
+      type: object
+      properties:
+        receiver:
+          $ref: '#/components/schemas/Receiver'
+        merged_count:
+          type: integer
+          description: Number of receivers merged
+        invoices_updated:
+          type: integer
+          description: Number of invoices reassigned to the target receiver
+
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Tag ID
+        user_id:
+          type: string
+          description: Owner user ID
+        name:
+          type: string
+          description: Tag name
+        color:
+          type: string
+          description: Hex color code (e.g., #FF5733)
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    InvoiceTagReference:
+      type: object
+      description: Minimal tag reference included in invoice responses
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          description: Tag ID
+        name:
+          type: string
+          description: Tag name
+
+    CreateTagRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Tag name
+        color:
+          type: string
+          description: Hex color code (e.g., #FF5733)
+          pattern: '^#[0-9A-Fa-f]{6}$'
+
+    UpdateTagRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Tag name
+        color:
+          type: string
+          description: Hex color code (e.g., #FF5733)
+          pattern: '^#[0-9A-Fa-f]{6}$'
+
+    TagListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
     InvoiceStatus:
       type: string
       enum:
@@ -1284,7 +1660,7 @@ components:
         tags:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/InvoiceTagReference'
           description: Tags for categorization
         status:
           $ref: '#/components/schemas/InvoiceStatus'
@@ -1328,10 +1704,11 @@ components:
         original_download_link:
           type: string
           format: uri
-        tags:
+        tag_ids:
           type: array
           items:
-            type: string
+            type: integer
+          description: Tag IDs to associate with the invoice
         status:
           $ref: '#/components/schemas/InvoiceStatus'
         due_date:
@@ -1384,10 +1761,11 @@ components:
         original_download_link:
           type: string
           format: uri
-        tags:
+        tag_ids:
           type: array
           items:
-            type: string
+            type: integer
+          description: Tag IDs to associate with the invoice
         status:
           $ref: '#/components/schemas/InvoiceStatus'
         due_date:
@@ -1444,6 +1822,45 @@ components:
           type: integer
         offset:
           type: integer
+
+    HtmlToPdfRequest:
+      type: object
+      required:
+        - html
+      properties:
+        html:
+          type: string
+          description: HTML content to convert to PDF
+        filename:
+          type: string
+          description: Output filename, defaults to generated.pdf
+        paper_width:
+          type: number
+          format: double
+          description: Paper width in inches, defaults to 8.5
+        paper_height:
+          type: number
+          format: double
+          description: Paper height in inches, defaults to 11
+        margin_top:
+          type: number
+          format: double
+          description: Top margin in inches, defaults to 0.4
+        margin_bottom:
+          type: number
+          format: double
+          description: Bottom margin in inches, defaults to 0.4
+        margin_left:
+          type: number
+          format: double
+          description: Left margin in inches, defaults to 0.4
+        margin_right:
+          type: number
+          format: double
+          description: Right margin in inches, defaults to 0.4
+        landscape:
+          type: boolean
+          description: Landscape orientation, defaults to false
 
     UploadResponse:
       type: object

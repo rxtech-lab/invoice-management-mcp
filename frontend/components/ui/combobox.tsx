@@ -227,9 +227,11 @@ function ComboboxChip({
   className,
   children,
   showRemove = true,
+  value: _value,
   ...props
 }: ComboboxPrimitive.Chip.Props & {
   showRemove?: boolean
+  value?: unknown
 }) {
   return (
     <ComboboxPrimitive.Chip

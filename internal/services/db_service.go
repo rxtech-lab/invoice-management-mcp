@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -109,14 +110,135 @@ func (s *dbService) GetDB() *gorm.DB {
 
 // migrate runs database migrations for invoice management models
 func (s *dbService) migrate() error {
-	return s.db.AutoMigrate(
+	if err := s.db.AutoMigrate(
 		&models.InvoiceCategory{},
 		&models.InvoiceCompany{},
 		&models.InvoiceReceiver{},
+		&models.InvoiceTag{},
+		&models.InvoiceTagMapping{},
 		&models.Invoice{},
 		&models.InvoiceItem{},
 		&models.FileUpload{},
-	)
+	); err != nil {
+		return err
+	}
+
+	// Migrate legacy tags from JSON array to many-to-many relationship
+	return s.migrateLegacyTags()
+}
+
+// migrateLegacyTags migrates existing JSON tags to the new many-to-many relationship
+func (s *dbService) migrateLegacyTags() error {
+	// Check if the tags column exists by querying the schema
+	type columnInfo struct {
+		Name string `gorm:"column:name"`
+	}
+	var columns []columnInfo
+	if err := s.db.Raw("PRAGMA table_info(invoices)").Scan(&columns).Error; err != nil {
+		// Can't query schema, skip migration
+		return nil
+	}
+
+	// Check if 'tags' column exists
+	hasTagsColumn := false
+	for _, col := range columns {
+		if col.Name == "tags" {
+			hasTagsColumn = true
+			break
+		}
+	}
+	if !hasTagsColumn {
+		// No legacy tags column, skip migration
+		return nil
+	}
+
+	// Use raw query to get invoices with legacy tags
+	type invoiceWithTags struct {
+		ID     uint   `gorm:"column:id"`
+		UserID string `gorm:"column:user_id"`
+		Tags   string `gorm:"column:tags"`
+	}
+
+	var invoices []invoiceWithTags
+	if err := s.db.Raw(`
+		SELECT id, user_id, tags
+		FROM invoices
+		WHERE tags IS NOT NULL AND tags != '[]' AND tags != ''
+	`).Scan(&invoices).Error; err != nil {
+		// Query failed, skip migration
+		return nil
+	}
+
+	if len(invoices) == 0 {
+		return nil
+	}
+
+	// Build tag map per user: userID -> tagName -> tagID
+	tagMap := make(map[string]map[string]uint)
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, inv := range invoices {
+			// Parse the JSON tags string manually
+			var tagNames []string
+			if inv.Tags == "" {
+				continue
+			}
+			if err := json.Unmarshal([]byte(inv.Tags), &tagNames); err != nil {
+				// Invalid JSON, skip this invoice
+				continue
+			}
+			if len(tagNames) == 0 {
+				continue
+			}
+
+			if tagMap[inv.UserID] == nil {
+				tagMap[inv.UserID] = make(map[string]uint)
+			}
+
+			for _, tagName := range tagNames {
+				if tagName == "" {
+					continue
+				}
+
+				// Check if tag already exists for this user
+				tagID, exists := tagMap[inv.UserID][tagName]
+				if !exists {
+					// Check if it exists in the database
+					var existingTag models.InvoiceTag
+					err := tx.Where("user_id = ? AND name = ?", inv.UserID, tagName).First(&existingTag).Error
+					if err == nil {
+						tagID = existingTag.ID
+					} else {
+						// Create new tag
+						newTag := models.InvoiceTag{
+							UserID: inv.UserID,
+							Name:   tagName,
+							Color:  "#6B7280", // Default gray color
+						}
+						if err := tx.Create(&newTag).Error; err != nil {
+							return err
+						}
+						tagID = newTag.ID
+					}
+					tagMap[inv.UserID][tagName] = tagID
+				}
+
+				// Create mapping if it doesn't exist
+				var existingMapping models.InvoiceTagMapping
+				err := tx.Where("invoice_id = ? AND invoice_tag_id = ?", inv.ID, tagID).First(&existingMapping).Error
+				if err != nil {
+					mapping := models.InvoiceTagMapping{
+						InvoiceID: inv.ID,
+						TagID:     tagID,
+					}
+					if err := tx.Create(&mapping).Error; err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
 }
 
 // Close closes the database connection

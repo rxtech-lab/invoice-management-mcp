@@ -45,6 +45,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
 	receiverService := services.NewReceiverService(db)
+	tagService := services.NewTagService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := services.NewMockUploadService()
 	fileUploadService := services.NewFileUploadService(db)
@@ -61,11 +62,13 @@ func NewTestSetup(t *testing.T) *TestSetup {
 		categoryService,
 		companyService,
 		receiverService,
+		tagService,
 		invoiceService,
 		uploadService,
 		fileUploadService,
 		analyticsService,
 		fileUnlinkService,
+		nil, // No PDF service for tests
 		nil, // No MCP server for tests
 	)
 
@@ -402,6 +405,7 @@ func NewTestSetupWithFileServer(t *testing.T, fileServerURL string, withOAuth bo
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
 	receiverService := services.NewReceiverService(db)
+	tagService := services.NewTagService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := services.NewMockUploadService()
 	fileUploadService := services.NewFileUploadService(db)
@@ -419,11 +423,13 @@ func NewTestSetupWithFileServer(t *testing.T, fileServerURL string, withOAuth bo
 		categoryService,
 		companyService,
 		receiverService,
+		tagService,
 		invoiceService,
 		uploadService,
 		fileUploadService,
 		analyticsService,
 		fileUnlinkService,
+		nil, // No PDF service for tests
 		nil, // No MCP server for tests
 	)
 

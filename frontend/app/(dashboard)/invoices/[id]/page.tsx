@@ -5,6 +5,7 @@ import { getInvoice } from "@/lib/api/invoices";
 import { getCategories } from "@/lib/api/categories";
 import { getCompanies } from "@/lib/api/companies";
 import { getReceivers } from "@/lib/api/receivers";
+import { getTags } from "@/lib/api/tags";
 
 interface InvoiceDetailPageProps {
   params: Promise<{ id: string }>;
@@ -24,13 +25,15 @@ export default async function InvoiceDetailPage({
   let categoriesResponse;
   let companiesResponse;
   let receiversResponse;
+  let tagsResponse;
 
   try {
-    [invoice, categoriesResponse, companiesResponse, receiversResponse] = await Promise.all([
+    [invoice, categoriesResponse, companiesResponse, receiversResponse, tagsResponse] = await Promise.all([
       getInvoice(invoiceId),
       getCategories({ limit: 100 }),
       getCompanies({ limit: 100 }),
       getReceivers({ limit: 100 }),
+      getTags({ limit: 100 }),
     ]);
   } catch {
     notFound();
@@ -43,6 +46,7 @@ export default async function InvoiceDetailPage({
         categories={categoriesResponse.data || []}
         companies={companiesResponse.data || []}
         receivers={receiversResponse.data || []}
+        tags={tagsResponse.data || []}
       />
 
       <InvoiceItemsTable

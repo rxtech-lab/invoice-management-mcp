@@ -4,11 +4,13 @@ import {
   getAnalyticsByCategory,
   getAnalyticsByCompany,
   getAnalyticsByReceiver,
+  getAnalyticsByTag,
 } from "@/lib/api/analytics";
 import { getInvoices } from "@/lib/api/invoices";
 import { PeriodSelector } from "@/components/dashboard/period-selector";
 import { AnalyticsSummaryCards } from "@/components/dashboard/analytics-summary-cards";
 import { CategoryBreakdownChart } from "@/components/dashboard/category-breakdown-chart";
+import { TagBreakdownChart } from "@/components/dashboard/tag-breakdown-chart";
 import { GroupBreakdownChart } from "@/components/dashboard/group-breakdown-chart";
 import { SpendingTrendChart } from "@/components/dashboard/spending-trend-chart";
 import type { AnalyticsPeriod } from "@/lib/api/types";
@@ -43,11 +45,12 @@ export default async function DashboardPage({
   const period = (params.period as AnalyticsPeriod) || "1m";
 
   // Fetch all analytics data in parallel
-  const [summary, byCategory, byCompany, byReceiver, invoicesResponse] = await Promise.all([
+  const [summary, byCategory, byCompany, byReceiver, byTag, invoicesResponse] = await Promise.all([
     getAnalyticsSummary(period),
     getAnalyticsByCategory(period),
     getAnalyticsByCompany(period),
     getAnalyticsByReceiver(period),
+    getAnalyticsByTag(period),
     getInvoices({ limit: 1000 }),
   ]);
 
@@ -78,9 +81,12 @@ export default async function DashboardPage({
       </Suspense>
 
       {/* Breakdown Charts Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Suspense fallback={<ChartFallback />}>
           <CategoryBreakdownChart data={byCategory} />
+        </Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <TagBreakdownChart data={byTag} />
         </Suspense>
         <Suspense fallback={<ChartFallback />}>
           <GroupBreakdownChart

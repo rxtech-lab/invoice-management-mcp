@@ -15,7 +15,8 @@ type InvoiceListOptions struct {
 	CompanyID  *uint
 	ReceiverID *uint
 	Status     *models.InvoiceStatus
-	Tags       []string
+	Tags       []string // Deprecated: use TagIDs instead
+	TagIDs     []uint   // Filter by tag IDs
 	StartDate  *time.Time
 	EndDate    *time.Time
 	SortBy     string // "created_at", "amount", "due_date", "title"
@@ -43,6 +44,10 @@ type InvoiceService interface {
 	// Status management
 	UpdateInvoiceStatus(userID string, id uint, status models.InvoiceStatus) error
 	GetOverdueInvoices(userID string) ([]models.Invoice, error)
+
+	// Tag management
+	SetInvoiceTags(userID string, invoiceID uint, tagNames []string) error
+	SetInvoiceTagsByID(userID string, invoiceID uint, tagIDs []int) error
 }
 
 type invoiceService struct {
@@ -78,6 +83,7 @@ func (s *invoiceService) GetInvoiceByID(userID string, id uint) (*models.Invoice
 		Preload("Company").
 		Preload("Receiver").
 		Preload("Items").
+		Preload("Tags").
 		First(&invoice).Error
 	if err != nil {
 		return nil, err
@@ -122,6 +128,11 @@ func (s *invoiceService) ListInvoices(userID string, opts InvoiceListOptions) ([
 		query = query.Where("created_at <= ?", *opts.EndDate)
 	}
 
+	// Filter by tag IDs using subquery
+	if len(opts.TagIDs) > 0 {
+		query = query.Where("id IN (SELECT invoice_id FROM invoice_tag_mappings WHERE invoice_tag_id IN ?)", opts.TagIDs)
+	}
+
 	// Get total count
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -152,7 +163,7 @@ func (s *invoiceService) ListInvoices(userID string, opts InvoiceListOptions) ([
 	}
 
 	// Preload relationships
-	query = query.Preload("Category").Preload("Company").Preload("Receiver").Preload("Items")
+	query = query.Preload("Category").Preload("Company").Preload("Receiver").Preload("Items").Preload("Tags")
 
 	if err := query.Find(&invoices).Error; err != nil {
 		return nil, 0, err
@@ -171,6 +182,7 @@ func (s *invoiceService) UpdateInvoice(userID string, invoice *models.Invoice) e
 	}
 
 	// Update fields (amount is NOT updated - it's calculated from items)
+	// Tags are updated separately via SetInvoiceTags
 	existing.Title = invoice.Title
 	existing.Description = invoice.Description
 	existing.InvoiceStartedAt = invoice.InvoiceStartedAt
@@ -180,7 +192,6 @@ func (s *invoiceService) UpdateInvoice(userID string, invoice *models.Invoice) e
 	existing.CategoryID = invoice.CategoryID
 	existing.CompanyID = invoice.CompanyID
 	existing.OriginalDownloadLink = invoice.OriginalDownloadLink
-	existing.Tags = invoice.Tags
 	existing.Status = invoice.Status
 	existing.DueDate = invoice.DueDate
 
@@ -217,6 +228,7 @@ func (s *invoiceService) SearchInvoices(userID string, query string) ([]models.I
 		Preload("Company").
 		Preload("Receiver").
 		Preload("Items").
+		Preload("Tags").
 		Order("created_at DESC").
 		Find(&invoices).Error
 
@@ -329,6 +341,7 @@ func (s *invoiceService) GetOverdueInvoices(userID string) ([]models.Invoice, er
 		Preload("Company").
 		Preload("Receiver").
 		Preload("Items").
+		Preload("Tags").
 		Order("due_date ASC").
 		Find(&invoices).Error
 
@@ -349,4 +362,98 @@ func (s *invoiceService) updateInvoiceTotal(tx *gorm.DB, invoiceID uint) error {
 	return tx.Model(&models.Invoice{}).
 		Where("id = ?", invoiceID).
 		Update("amount", total).Error
+}
+
+// SetInvoiceTags sets the tags for an invoice by tag names
+// It will look up existing tags or create new ones as needed
+func (s *invoiceService) SetInvoiceTags(userID string, invoiceID uint, tagNames []string) error {
+	// Verify invoice ownership
+	_, err := s.GetInvoiceByID(userID, invoiceID)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Delete existing tag mappings for this invoice
+		if err := tx.Where("invoice_id = ?", invoiceID).Delete(&models.InvoiceTagMapping{}).Error; err != nil {
+			return err
+		}
+
+		if len(tagNames) == 0 {
+			return nil
+		}
+
+		// For each tag name, find or create the tag and create the mapping
+		for _, tagName := range tagNames {
+			if tagName == "" {
+				continue
+			}
+
+			// Try to find existing tag
+			var tag models.InvoiceTag
+			err := tx.Where("user_id = ? AND name = ?", userID, tagName).First(&tag).Error
+			if err != nil {
+				// Create new tag
+				tag = models.InvoiceTag{
+					UserID: userID,
+					Name:   tagName,
+					Color:  "#6B7280", // Default gray color
+				}
+				if err := tx.Create(&tag).Error; err != nil {
+					return err
+				}
+			}
+
+			// Create mapping
+			mapping := models.InvoiceTagMapping{
+				InvoiceID: invoiceID,
+				TagID:     tag.ID,
+			}
+			if err := tx.Create(&mapping).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// SetInvoiceTagsByID sets tags for an invoice using tag IDs
+func (s *invoiceService) SetInvoiceTagsByID(userID string, invoiceID uint, tagIDs []int) error {
+	// Verify invoice ownership
+	_, err := s.GetInvoiceByID(userID, invoiceID)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Delete existing tag mappings for this invoice
+		if err := tx.Where("invoice_id = ?", invoiceID).Delete(&models.InvoiceTagMapping{}).Error; err != nil {
+			return err
+		}
+
+		if len(tagIDs) == 0 {
+			return nil
+		}
+
+		// For each tag ID, verify it exists and belongs to user, then create mapping
+		for _, tagID := range tagIDs {
+			var tag models.InvoiceTag
+			err := tx.Where("id = ? AND user_id = ?", tagID, userID).First(&tag).Error
+			if err != nil {
+				return fmt.Errorf("tag with ID %d not found or not owned by user", tagID)
+			}
+
+			// Create mapping
+			mapping := models.InvoiceTagMapping{
+				InvoiceID: invoiceID,
+				TagID:     tag.ID,
+			}
+			if err := tx.Create(&mapping).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }

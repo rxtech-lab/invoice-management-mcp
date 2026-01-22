@@ -25,6 +25,9 @@ type ServerInterface interface {
 	// Get invoice analytics grouped by receiver
 	// (GET /api/analytics/by-receiver)
 	GetAnalyticsByReceiver(c *fiber.Ctx, params GetAnalyticsByReceiverParams) error
+	// Get invoice analytics grouped by tag
+	// (GET /api/analytics/by-tag)
+	GetAnalyticsByTag(c *fiber.Ctx, params GetAnalyticsByTagParams) error
 	// Get invoice summary analytics
 	// (GET /api/analytics/summary)
 	GetAnalyticsSummary(c *fiber.Ctx, params GetAnalyticsSummaryParams) error
@@ -82,6 +85,12 @@ type ServerInterface interface {
 	// Update invoice status
 	// (PATCH /api/invoices/{id}/status)
 	UpdateInvoiceStatus(c *fiber.Ctx, id InvoiceId) error
+	// Add tag to invoice
+	// (POST /api/invoices/{id}/tags)
+	AddTagToInvoice(c *fiber.Ctx, id InvoiceId) error
+	// Remove tag from invoice
+	// (DELETE /api/invoices/{id}/tags/{tagId})
+	RemoveTagFromInvoice(c *fiber.Ctx, id InvoiceId, tagId int) error
 	// Delete invoice item
 	// (DELETE /api/invoices/{invoice_id}/items/{item_id})
 	DeleteInvoiceItem(c *fiber.Ctx, invoiceId int, itemId int) error
@@ -94,6 +103,9 @@ type ServerInterface interface {
 	// Create receiver
 	// (POST /api/receivers)
 	CreateReceiver(c *fiber.Ctx) error
+	// Merge receivers
+	// (POST /api/receivers/merge)
+	MergeReceivers(c *fiber.Ctx) error
 	// Delete receiver
 	// (DELETE /api/receivers/{id})
 	DeleteReceiver(c *fiber.Ctx, id ReceiverId) error
@@ -103,9 +115,27 @@ type ServerInterface interface {
 	// Update receiver
 	// (PUT /api/receivers/{id})
 	UpdateReceiver(c *fiber.Ctx, id ReceiverId) error
+	// List tags
+	// (GET /api/tags)
+	ListTags(c *fiber.Ctx, params ListTagsParams) error
+	// Create tag
+	// (POST /api/tags)
+	CreateTag(c *fiber.Ctx) error
+	// Delete tag
+	// (DELETE /api/tags/{id})
+	DeleteTag(c *fiber.Ctx, id TagId) error
+	// Get tag
+	// (GET /api/tags/{id})
+	GetTag(c *fiber.Ctx, id TagId) error
+	// Update tag
+	// (PUT /api/tags/{id})
+	UpdateTag(c *fiber.Ctx, id TagId) error
 	// Upload file
 	// (POST /api/upload)
 	UploadFile(c *fiber.Ctx) error
+	// Convert HTML to PDF and upload
+	// (POST /api/upload/html-to-pdf)
+	UploadHtmlToPdf(c *fiber.Ctx) error
 	// Get presigned upload URL
 	// (GET /api/upload/presigned)
 	GetPresignedURL(c *fiber.Ctx, params GetPresignedURLParams) error
@@ -203,6 +233,34 @@ func (siw *ServerInterfaceWrapper) GetAnalyticsByReceiver(c *fiber.Ctx) error {
 	}
 
 	return siw.Handler.GetAnalyticsByReceiver(c, params)
+}
+
+// GetAnalyticsByTag operation middleware
+func (siw *ServerInterfaceWrapper) GetAnalyticsByTag(c *fiber.Ctx) error {
+
+	var err error
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAnalyticsByTagParams
+
+	var query url.Values
+	query, err = url.ParseQuery(string(c.Request().URI().QueryString()))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for query string: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "period" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "period", query, &params.Period)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter period: %w", err).Error())
+	}
+
+	return siw.Handler.GetAnalyticsByTag(c, params)
 }
 
 // GetAnalyticsSummary operation middleware
@@ -523,6 +581,13 @@ func (siw *ServerInterfaceWrapper) ListInvoices(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter receiver_id: %w", err).Error())
 	}
 
+	// ------------- Optional query parameter "tag_ids" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tag_ids", query, &params.TagIds)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter tag_ids: %w", err).Error())
+	}
+
 	// ------------- Optional query parameter "status" -------------
 
 	err = runtime.BindQueryParameter("form", true, false, "status", query, &params.Status)
@@ -671,6 +736,54 @@ func (siw *ServerInterfaceWrapper) UpdateInvoiceStatus(c *fiber.Ctx) error {
 	return siw.Handler.UpdateInvoiceStatus(c, id)
 }
 
+// AddTagToInvoice operation middleware
+func (siw *ServerInterfaceWrapper) AddTagToInvoice(c *fiber.Ctx) error {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id InvoiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Params("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter id: %w", err).Error())
+	}
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.AddTagToInvoice(c, id)
+}
+
+// RemoveTagFromInvoice operation middleware
+func (siw *ServerInterfaceWrapper) RemoveTagFromInvoice(c *fiber.Ctx) error {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id InvoiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Params("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter id: %w", err).Error())
+	}
+
+	// ------------- Path parameter "tagId" -------------
+	var tagId int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tagId", c.Params("tagId"), &tagId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter tagId: %w", err).Error())
+	}
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.RemoveTagFromInvoice(c, id, tagId)
+}
+
 // DeleteInvoiceItem operation middleware
 func (siw *ServerInterfaceWrapper) DeleteInvoiceItem(c *fiber.Ctx) error {
 
@@ -779,6 +892,16 @@ func (siw *ServerInterfaceWrapper) CreateReceiver(c *fiber.Ctx) error {
 	return siw.Handler.CreateReceiver(c)
 }
 
+// MergeReceivers operation middleware
+func (siw *ServerInterfaceWrapper) MergeReceivers(c *fiber.Ctx) error {
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.MergeReceivers(c)
+}
+
 // DeleteReceiver operation middleware
 func (siw *ServerInterfaceWrapper) DeleteReceiver(c *fiber.Ctx) error {
 
@@ -839,6 +962,118 @@ func (siw *ServerInterfaceWrapper) UpdateReceiver(c *fiber.Ctx) error {
 	return siw.Handler.UpdateReceiver(c, id)
 }
 
+// ListTags operation middleware
+func (siw *ServerInterfaceWrapper) ListTags(c *fiber.Ctx) error {
+
+	var err error
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTagsParams
+
+	var query url.Values
+	query, err = url.ParseQuery(string(c.Request().URI().QueryString()))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for query string: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "keyword" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "keyword", query, &params.Keyword)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter keyword: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", query, &params.Limit)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter limit: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", query, &params.Offset)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter offset: %w", err).Error())
+	}
+
+	return siw.Handler.ListTags(c, params)
+}
+
+// CreateTag operation middleware
+func (siw *ServerInterfaceWrapper) CreateTag(c *fiber.Ctx) error {
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.CreateTag(c)
+}
+
+// DeleteTag operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTag(c *fiber.Ctx) error {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id TagId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Params("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter id: %w", err).Error())
+	}
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.DeleteTag(c, id)
+}
+
+// GetTag operation middleware
+func (siw *ServerInterfaceWrapper) GetTag(c *fiber.Ctx) error {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id TagId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Params("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter id: %w", err).Error())
+	}
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.GetTag(c, id)
+}
+
+// UpdateTag operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTag(c *fiber.Ctx) error {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id TagId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Params("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter id: %w", err).Error())
+	}
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.UpdateTag(c, id)
+}
+
 // UploadFile operation middleware
 func (siw *ServerInterfaceWrapper) UploadFile(c *fiber.Ctx) error {
 
@@ -847,6 +1082,16 @@ func (siw *ServerInterfaceWrapper) UploadFile(c *fiber.Ctx) error {
 	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
 
 	return siw.Handler.UploadFile(c)
+}
+
+// UploadHtmlToPdf operation middleware
+func (siw *ServerInterfaceWrapper) UploadHtmlToPdf(c *fiber.Ctx) error {
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.UploadHtmlToPdf(c)
 }
 
 // GetPresignedURL operation middleware
@@ -925,6 +1170,8 @@ func RegisterHandlersWithOptions(router fiber.Router, si ServerInterface, option
 
 	router.Get(options.BaseURL+"/api/analytics/by-receiver", wrapper.GetAnalyticsByReceiver)
 
+	router.Get(options.BaseURL+"/api/analytics/by-tag", wrapper.GetAnalyticsByTag)
+
 	router.Get(options.BaseURL+"/api/analytics/summary", wrapper.GetAnalyticsSummary)
 
 	router.Get(options.BaseURL+"/api/categories", wrapper.ListCategories)
@@ -963,6 +1210,10 @@ func RegisterHandlersWithOptions(router fiber.Router, si ServerInterface, option
 
 	router.Patch(options.BaseURL+"/api/invoices/:id/status", wrapper.UpdateInvoiceStatus)
 
+	router.Post(options.BaseURL+"/api/invoices/:id/tags", wrapper.AddTagToInvoice)
+
+	router.Delete(options.BaseURL+"/api/invoices/:id/tags/:tagId", wrapper.RemoveTagFromInvoice)
+
 	router.Delete(options.BaseURL+"/api/invoices/:invoice_id/items/:item_id", wrapper.DeleteInvoiceItem)
 
 	router.Put(options.BaseURL+"/api/invoices/:invoice_id/items/:item_id", wrapper.UpdateInvoiceItem)
@@ -971,13 +1222,27 @@ func RegisterHandlersWithOptions(router fiber.Router, si ServerInterface, option
 
 	router.Post(options.BaseURL+"/api/receivers", wrapper.CreateReceiver)
 
+	router.Post(options.BaseURL+"/api/receivers/merge", wrapper.MergeReceivers)
+
 	router.Delete(options.BaseURL+"/api/receivers/:id", wrapper.DeleteReceiver)
 
 	router.Get(options.BaseURL+"/api/receivers/:id", wrapper.GetReceiver)
 
 	router.Put(options.BaseURL+"/api/receivers/:id", wrapper.UpdateReceiver)
 
+	router.Get(options.BaseURL+"/api/tags", wrapper.ListTags)
+
+	router.Post(options.BaseURL+"/api/tags", wrapper.CreateTag)
+
+	router.Delete(options.BaseURL+"/api/tags/:id", wrapper.DeleteTag)
+
+	router.Get(options.BaseURL+"/api/tags/:id", wrapper.GetTag)
+
+	router.Put(options.BaseURL+"/api/tags/:id", wrapper.UpdateTag)
+
 	router.Post(options.BaseURL+"/api/upload", wrapper.UploadFile)
+
+	router.Post(options.BaseURL+"/api/upload/html-to-pdf", wrapper.UploadHtmlToPdf)
 
 	router.Get(options.BaseURL+"/api/upload/presigned", wrapper.GetPresignedURL)
 
@@ -1063,6 +1328,32 @@ func (response GetAnalyticsByReceiver200JSONResponse) VisitGetAnalyticsByReceive
 type GetAnalyticsByReceiver401JSONResponse struct{ UnauthorizedJSONResponse }
 
 func (response GetAnalyticsByReceiver401JSONResponse) VisitGetAnalyticsByReceiverResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type GetAnalyticsByTagRequestObject struct {
+	Params GetAnalyticsByTagParams
+}
+
+type GetAnalyticsByTagResponseObject interface {
+	VisitGetAnalyticsByTagResponse(ctx *fiber.Ctx) error
+}
+
+type GetAnalyticsByTag200JSONResponse AnalyticsByGroup
+
+func (response GetAnalyticsByTag200JSONResponse) VisitGetAnalyticsByTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type GetAnalyticsByTag401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetAnalyticsByTag401JSONResponse) VisitGetAnalyticsByTagResponse(ctx *fiber.Ctx) error {
 	ctx.Response().Header.Set("Content-Type", "application/json")
 	ctx.Status(401)
 
@@ -1709,6 +2000,87 @@ func (response UpdateInvoiceStatus401JSONResponse) VisitUpdateInvoiceStatusRespo
 	return ctx.JSON(&response)
 }
 
+type AddTagToInvoiceRequestObject struct {
+	Id   InvoiceId `json:"id"`
+	Body *AddTagToInvoiceJSONRequestBody
+}
+
+type AddTagToInvoiceResponseObject interface {
+	VisitAddTagToInvoiceResponse(ctx *fiber.Ctx) error
+}
+
+type AddTagToInvoice200JSONResponse Invoice
+
+func (response AddTagToInvoice200JSONResponse) VisitAddTagToInvoiceResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type AddTagToInvoice400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response AddTagToInvoice400JSONResponse) VisitAddTagToInvoiceResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type AddTagToInvoice401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response AddTagToInvoice401JSONResponse) VisitAddTagToInvoiceResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type AddTagToInvoice404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AddTagToInvoice404JSONResponse) VisitAddTagToInvoiceResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(404)
+
+	return ctx.JSON(&response)
+}
+
+type RemoveTagFromInvoiceRequestObject struct {
+	Id    InvoiceId `json:"id"`
+	TagId int       `json:"tagId"`
+}
+
+type RemoveTagFromInvoiceResponseObject interface {
+	VisitRemoveTagFromInvoiceResponse(ctx *fiber.Ctx) error
+}
+
+type RemoveTagFromInvoice200JSONResponse Invoice
+
+func (response RemoveTagFromInvoice200JSONResponse) VisitRemoveTagFromInvoiceResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type RemoveTagFromInvoice401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RemoveTagFromInvoice401JSONResponse) VisitRemoveTagFromInvoiceResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type RemoveTagFromInvoice404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RemoveTagFromInvoice404JSONResponse) VisitRemoveTagFromInvoiceResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(404)
+
+	return ctx.JSON(&response)
+}
+
 type DeleteInvoiceItemRequestObject struct {
 	InvoiceId int `json:"invoice_id"`
 	ItemId    int `json:"item_id"`
@@ -1833,6 +2205,50 @@ func (response CreateReceiver401JSONResponse) VisitCreateReceiverResponse(ctx *f
 	return ctx.JSON(&response)
 }
 
+type MergeReceiversRequestObject struct {
+	Body *MergeReceiversJSONRequestBody
+}
+
+type MergeReceiversResponseObject interface {
+	VisitMergeReceiversResponse(ctx *fiber.Ctx) error
+}
+
+type MergeReceivers200JSONResponse MergeReceiversResult
+
+func (response MergeReceivers200JSONResponse) VisitMergeReceiversResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type MergeReceivers400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response MergeReceivers400JSONResponse) VisitMergeReceiversResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type MergeReceivers401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response MergeReceivers401JSONResponse) VisitMergeReceiversResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type MergeReceivers404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response MergeReceivers404JSONResponse) VisitMergeReceiversResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(404)
+
+	return ctx.JSON(&response)
+}
+
 type DeleteReceiverRequestObject struct {
 	Id ReceiverId `json:"id"`
 }
@@ -1938,6 +2354,172 @@ func (response UpdateReceiver401JSONResponse) VisitUpdateReceiverResponse(ctx *f
 	return ctx.JSON(&response)
 }
 
+type ListTagsRequestObject struct {
+	Params ListTagsParams
+}
+
+type ListTagsResponseObject interface {
+	VisitListTagsResponse(ctx *fiber.Ctx) error
+}
+
+type ListTags200JSONResponse TagListResponse
+
+func (response ListTags200JSONResponse) VisitListTagsResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type ListTags401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListTags401JSONResponse) VisitListTagsResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type CreateTagRequestObject struct {
+	Body *CreateTagJSONRequestBody
+}
+
+type CreateTagResponseObject interface {
+	VisitCreateTagResponse(ctx *fiber.Ctx) error
+}
+
+type CreateTag201JSONResponse Tag
+
+func (response CreateTag201JSONResponse) VisitCreateTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(201)
+
+	return ctx.JSON(&response)
+}
+
+type CreateTag400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateTag400JSONResponse) VisitCreateTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type CreateTag401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateTag401JSONResponse) VisitCreateTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type DeleteTagRequestObject struct {
+	Id TagId `json:"id"`
+}
+
+type DeleteTagResponseObject interface {
+	VisitDeleteTagResponse(ctx *fiber.Ctx) error
+}
+
+type DeleteTag204Response struct {
+}
+
+func (response DeleteTag204Response) VisitDeleteTagResponse(ctx *fiber.Ctx) error {
+	ctx.Status(204)
+	return nil
+}
+
+type DeleteTag401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteTag401JSONResponse) VisitDeleteTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type DeleteTag404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteTag404JSONResponse) VisitDeleteTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(404)
+
+	return ctx.JSON(&response)
+}
+
+type GetTagRequestObject struct {
+	Id TagId `json:"id"`
+}
+
+type GetTagResponseObject interface {
+	VisitGetTagResponse(ctx *fiber.Ctx) error
+}
+
+type GetTag200JSONResponse Tag
+
+func (response GetTag200JSONResponse) VisitGetTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type GetTag401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetTag401JSONResponse) VisitGetTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type GetTag404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetTag404JSONResponse) VisitGetTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(404)
+
+	return ctx.JSON(&response)
+}
+
+type UpdateTagRequestObject struct {
+	Id   TagId `json:"id"`
+	Body *UpdateTagJSONRequestBody
+}
+
+type UpdateTagResponseObject interface {
+	VisitUpdateTagResponse(ctx *fiber.Ctx) error
+}
+
+type UpdateTag200JSONResponse Tag
+
+func (response UpdateTag200JSONResponse) VisitUpdateTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type UpdateTag400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateTag400JSONResponse) VisitUpdateTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type UpdateTag401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateTag401JSONResponse) VisitUpdateTagResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
 type UploadFileRequestObject struct {
 	Body *multipart.Reader
 }
@@ -1969,6 +2551,50 @@ type UploadFile401JSONResponse struct{ UnauthorizedJSONResponse }
 func (response UploadFile401JSONResponse) VisitUploadFileResponse(ctx *fiber.Ctx) error {
 	ctx.Response().Header.Set("Content-Type", "application/json")
 	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type UploadHtmlToPdfRequestObject struct {
+	Body *UploadHtmlToPdfJSONRequestBody
+}
+
+type UploadHtmlToPdfResponseObject interface {
+	VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error
+}
+
+type UploadHtmlToPdf201JSONResponse UploadResponse
+
+func (response UploadHtmlToPdf201JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(201)
+
+	return ctx.JSON(&response)
+}
+
+type UploadHtmlToPdf400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UploadHtmlToPdf400JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type UploadHtmlToPdf401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UploadHtmlToPdf401JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type UploadHtmlToPdf500JSONResponse Error
+
+func (response UploadHtmlToPdf500JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(500)
 
 	return ctx.JSON(&response)
 }
@@ -2037,6 +2663,9 @@ type StrictServerInterface interface {
 	// Get invoice analytics grouped by receiver
 	// (GET /api/analytics/by-receiver)
 	GetAnalyticsByReceiver(ctx context.Context, request GetAnalyticsByReceiverRequestObject) (GetAnalyticsByReceiverResponseObject, error)
+	// Get invoice analytics grouped by tag
+	// (GET /api/analytics/by-tag)
+	GetAnalyticsByTag(ctx context.Context, request GetAnalyticsByTagRequestObject) (GetAnalyticsByTagResponseObject, error)
 	// Get invoice summary analytics
 	// (GET /api/analytics/summary)
 	GetAnalyticsSummary(ctx context.Context, request GetAnalyticsSummaryRequestObject) (GetAnalyticsSummaryResponseObject, error)
@@ -2094,6 +2723,12 @@ type StrictServerInterface interface {
 	// Update invoice status
 	// (PATCH /api/invoices/{id}/status)
 	UpdateInvoiceStatus(ctx context.Context, request UpdateInvoiceStatusRequestObject) (UpdateInvoiceStatusResponseObject, error)
+	// Add tag to invoice
+	// (POST /api/invoices/{id}/tags)
+	AddTagToInvoice(ctx context.Context, request AddTagToInvoiceRequestObject) (AddTagToInvoiceResponseObject, error)
+	// Remove tag from invoice
+	// (DELETE /api/invoices/{id}/tags/{tagId})
+	RemoveTagFromInvoice(ctx context.Context, request RemoveTagFromInvoiceRequestObject) (RemoveTagFromInvoiceResponseObject, error)
 	// Delete invoice item
 	// (DELETE /api/invoices/{invoice_id}/items/{item_id})
 	DeleteInvoiceItem(ctx context.Context, request DeleteInvoiceItemRequestObject) (DeleteInvoiceItemResponseObject, error)
@@ -2106,6 +2741,9 @@ type StrictServerInterface interface {
 	// Create receiver
 	// (POST /api/receivers)
 	CreateReceiver(ctx context.Context, request CreateReceiverRequestObject) (CreateReceiverResponseObject, error)
+	// Merge receivers
+	// (POST /api/receivers/merge)
+	MergeReceivers(ctx context.Context, request MergeReceiversRequestObject) (MergeReceiversResponseObject, error)
 	// Delete receiver
 	// (DELETE /api/receivers/{id})
 	DeleteReceiver(ctx context.Context, request DeleteReceiverRequestObject) (DeleteReceiverResponseObject, error)
@@ -2115,9 +2753,27 @@ type StrictServerInterface interface {
 	// Update receiver
 	// (PUT /api/receivers/{id})
 	UpdateReceiver(ctx context.Context, request UpdateReceiverRequestObject) (UpdateReceiverResponseObject, error)
+	// List tags
+	// (GET /api/tags)
+	ListTags(ctx context.Context, request ListTagsRequestObject) (ListTagsResponseObject, error)
+	// Create tag
+	// (POST /api/tags)
+	CreateTag(ctx context.Context, request CreateTagRequestObject) (CreateTagResponseObject, error)
+	// Delete tag
+	// (DELETE /api/tags/{id})
+	DeleteTag(ctx context.Context, request DeleteTagRequestObject) (DeleteTagResponseObject, error)
+	// Get tag
+	// (GET /api/tags/{id})
+	GetTag(ctx context.Context, request GetTagRequestObject) (GetTagResponseObject, error)
+	// Update tag
+	// (PUT /api/tags/{id})
+	UpdateTag(ctx context.Context, request UpdateTagRequestObject) (UpdateTagResponseObject, error)
 	// Upload file
 	// (POST /api/upload)
 	UploadFile(ctx context.Context, request UploadFileRequestObject) (UploadFileResponseObject, error)
+	// Convert HTML to PDF and upload
+	// (POST /api/upload/html-to-pdf)
+	UploadHtmlToPdf(ctx context.Context, request UploadHtmlToPdfRequestObject) (UploadHtmlToPdfResponseObject, error)
 	// Get presigned upload URL
 	// (GET /api/upload/presigned)
 	GetPresignedURL(ctx context.Context, request GetPresignedURLRequestObject) (GetPresignedURLResponseObject, error)
@@ -2212,6 +2868,33 @@ func (sh *strictHandler) GetAnalyticsByReceiver(ctx *fiber.Ctx, params GetAnalyt
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	} else if validResponse, ok := response.(GetAnalyticsByReceiverResponseObject); ok {
 		if err := validResponse.VisitGetAnalyticsByReceiverResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetAnalyticsByTag operation middleware
+func (sh *strictHandler) GetAnalyticsByTag(ctx *fiber.Ctx, params GetAnalyticsByTagParams) error {
+	var request GetAnalyticsByTagRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAnalyticsByTag(ctx.UserContext(), request.(GetAnalyticsByTagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAnalyticsByTag")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(GetAnalyticsByTagResponseObject); ok {
+		if err := validResponse.VisitGetAnalyticsByTagResponse(ctx); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 	} else if response != nil {
@@ -2775,6 +3458,67 @@ func (sh *strictHandler) UpdateInvoiceStatus(ctx *fiber.Ctx, id InvoiceId) error
 	return nil
 }
 
+// AddTagToInvoice operation middleware
+func (sh *strictHandler) AddTagToInvoice(ctx *fiber.Ctx, id InvoiceId) error {
+	var request AddTagToInvoiceRequestObject
+
+	request.Id = id
+
+	var body AddTagToInvoiceJSONRequestBody
+	if err := ctx.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	request.Body = &body
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.AddTagToInvoice(ctx.UserContext(), request.(AddTagToInvoiceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddTagToInvoice")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(AddTagToInvoiceResponseObject); ok {
+		if err := validResponse.VisitAddTagToInvoiceResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// RemoveTagFromInvoice operation middleware
+func (sh *strictHandler) RemoveTagFromInvoice(ctx *fiber.Ctx, id InvoiceId, tagId int) error {
+	var request RemoveTagFromInvoiceRequestObject
+
+	request.Id = id
+	request.TagId = tagId
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveTagFromInvoice(ctx.UserContext(), request.(RemoveTagFromInvoiceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveTagFromInvoice")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(RemoveTagFromInvoiceResponseObject); ok {
+		if err := validResponse.VisitRemoveTagFromInvoiceResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // DeleteInvoiceItem operation middleware
 func (sh *strictHandler) DeleteInvoiceItem(ctx *fiber.Ctx, invoiceId int, itemId int) error {
 	var request DeleteInvoiceItemRequestObject
@@ -2895,6 +3639,37 @@ func (sh *strictHandler) CreateReceiver(ctx *fiber.Ctx) error {
 	return nil
 }
 
+// MergeReceivers operation middleware
+func (sh *strictHandler) MergeReceivers(ctx *fiber.Ctx) error {
+	var request MergeReceiversRequestObject
+
+	var body MergeReceiversJSONRequestBody
+	if err := ctx.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	request.Body = &body
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.MergeReceivers(ctx.UserContext(), request.(MergeReceiversRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MergeReceivers")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(MergeReceiversResponseObject); ok {
+		if err := validResponse.VisitMergeReceiversResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // DeleteReceiver operation middleware
 func (sh *strictHandler) DeleteReceiver(ctx *fiber.Ctx, id ReceiverId) error {
 	var request DeleteReceiverRequestObject
@@ -2982,6 +3757,151 @@ func (sh *strictHandler) UpdateReceiver(ctx *fiber.Ctx, id ReceiverId) error {
 	return nil
 }
 
+// ListTags operation middleware
+func (sh *strictHandler) ListTags(ctx *fiber.Ctx, params ListTagsParams) error {
+	var request ListTagsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTags(ctx.UserContext(), request.(ListTagsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTags")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(ListTagsResponseObject); ok {
+		if err := validResponse.VisitListTagsResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CreateTag operation middleware
+func (sh *strictHandler) CreateTag(ctx *fiber.Ctx) error {
+	var request CreateTagRequestObject
+
+	var body CreateTagJSONRequestBody
+	if err := ctx.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	request.Body = &body
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateTag(ctx.UserContext(), request.(CreateTagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateTag")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(CreateTagResponseObject); ok {
+		if err := validResponse.VisitCreateTagResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// DeleteTag operation middleware
+func (sh *strictHandler) DeleteTag(ctx *fiber.Ctx, id TagId) error {
+	var request DeleteTagRequestObject
+
+	request.Id = id
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteTag(ctx.UserContext(), request.(DeleteTagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteTag")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(DeleteTagResponseObject); ok {
+		if err := validResponse.VisitDeleteTagResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetTag operation middleware
+func (sh *strictHandler) GetTag(ctx *fiber.Ctx, id TagId) error {
+	var request GetTagRequestObject
+
+	request.Id = id
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTag(ctx.UserContext(), request.(GetTagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTag")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(GetTagResponseObject); ok {
+		if err := validResponse.VisitGetTagResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UpdateTag operation middleware
+func (sh *strictHandler) UpdateTag(ctx *fiber.Ctx, id TagId) error {
+	var request UpdateTagRequestObject
+
+	request.Id = id
+
+	var body UpdateTagJSONRequestBody
+	if err := ctx.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	request.Body = &body
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTag(ctx.UserContext(), request.(UpdateTagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTag")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(UpdateTagResponseObject); ok {
+		if err := validResponse.VisitUpdateTagResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // UploadFile operation middleware
 func (sh *strictHandler) UploadFile(ctx *fiber.Ctx) error {
 	var request UploadFileRequestObject
@@ -3001,6 +3921,37 @@ func (sh *strictHandler) UploadFile(ctx *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	} else if validResponse, ok := response.(UploadFileResponseObject); ok {
 		if err := validResponse.VisitUploadFileResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UploadHtmlToPdf operation middleware
+func (sh *strictHandler) UploadHtmlToPdf(ctx *fiber.Ctx) error {
+	var request UploadHtmlToPdfRequestObject
+
+	var body UploadHtmlToPdfJSONRequestBody
+	if err := ctx.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	request.Body = &body
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadHtmlToPdf(ctx.UserContext(), request.(UploadHtmlToPdfRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadHtmlToPdf")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(UploadHtmlToPdfResponseObject); ok {
+		if err := validResponse.VisitUploadHtmlToPdfResponse(ctx); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 	} else if response != nil {
