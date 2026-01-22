@@ -3,10 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
-import type { Tag, CreateTagRequest, UpdateTagRequest } from "@/lib/api/types";
+import type {
+  Tag,
+  CreateTagRequest,
+  UpdateTagRequest,
+  PaginatedResponse,
+} from "@/lib/api/types";
 
 export async function createTagAction(
-  data: CreateTagRequest
+  data: CreateTagRequest,
 ): Promise<{ success: boolean; data?: Tag; error?: string }> {
   try {
     const tag = await apiClient<Tag>("/api/tags", {
@@ -25,7 +30,7 @@ export async function createTagAction(
 
 export async function updateTagAction(
   id: number,
-  data: UpdateTagRequest
+  data: UpdateTagRequest,
 ): Promise<{ success: boolean; data?: Tag; error?: string }> {
   try {
     const tag = await apiClient<Tag>(`/api/tags/${id}`, {
@@ -44,7 +49,7 @@ export async function updateTagAction(
 }
 
 export async function deleteTagAction(
-  id: number
+  id: number,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await apiClient<void>(`/api/tags/${id}`, { method: "DELETE" });
@@ -72,4 +77,29 @@ export async function deleteTagAndRedirect(id: number) {
     redirect("/tags");
   }
   return result;
+}
+
+export async function searchTagsAction(
+  keyword?: string,
+  limit: number = 20,
+): Promise<{ success: boolean; data?: Tag[]; error?: string }> {
+  try {
+    const params = new URLSearchParams();
+    if (keyword) {
+      params.set("keyword", keyword);
+    }
+    params.set("limit", String(limit));
+
+    const query = params.toString();
+    const response = await apiClient<PaginatedResponse<Tag>>(
+      `/api/tags${query ? `?${query}` : ""}`,
+    );
+    return { success: true, data: response.data || [] };
+  } catch (error) {
+    return {
+      success: false,
+      data: [],
+      error: error instanceof Error ? error.message : "Failed to search tags",
+    };
+  }
 }

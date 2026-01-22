@@ -5,11 +5,16 @@ import { getReceivers } from "@/lib/api/receivers";
 import { getTags } from "@/lib/api/tags";
 
 export default async function NewInvoicePage() {
-  const [categoriesResponse, companiesResponse, receiversResponse, tagsResponse] = await Promise.all([
+  const [
+    categoriesResponse,
+    companiesResponse,
+    receiversResponse,
+    tagsResponse,
+  ] = await Promise.all([
     getCategories({ limit: 100 }),
     getCompanies({ limit: 100 }),
     getReceivers({ limit: 100 }),
-    getTags({ limit: 100 }),
+    getTags({ limit: 20 }), // Reduced limit - tags are now fetched server-side on search
   ]);
 
   return (

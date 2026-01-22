@@ -206,6 +206,10 @@ func (s *analyticsService) getDateRange(period AnalyticsPeriod) (time.Time, time
 	return start, end
 }
 
+// itemTargetAmountSubquery returns the subquery to calculate USD-normalized amount from invoice_items
+// This replaces the deprecated invoices.target_amount field
+const itemTargetAmountSubquery = "(SELECT COALESCE(SUM(target_amount), 0) FROM invoice_items WHERE invoice_id = invoices.id AND deleted_at IS NULL)"
+
 // GetSummary returns aggregated invoice statistics for a period
 func (s *analyticsService) GetSummary(userID string, period AnalyticsPeriod) (*AnalyticsSummary, error) {
 	start, end := s.getDateRange(period)
@@ -220,12 +224,13 @@ func (s *analyticsService) GetSummary(userID string, period AnalyticsPeriod) (*A
 	baseQuery := s.db.Model(&models.Invoice{}).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ?", userID, start, end)
 
-	// Get total count and amount (use target_amount for USD normalization, fallback to amount)
+	// Get total count and amount (calculate from invoice_items.target_amount, fallback to amount)
 	var result struct {
 		Count  int64
 		Amount float64
 	}
-	if err := baseQuery.Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").Scan(&result).Error; err != nil {
+	selectExpr := "COUNT(*) as count, COALESCE(SUM(COALESCE(" + itemTargetAmountSubquery + ", amount)), 0) as amount"
+	if err := baseQuery.Select(selectExpr).Scan(&result).Error; err != nil {
 		return nil, err
 	}
 	summary.InvoiceCount = result.Count
@@ -235,7 +240,7 @@ func (s *analyticsService) GetSummary(userID string, period AnalyticsPeriod) (*A
 	if err := s.db.Model(&models.Invoice{}).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND status = ?",
 			userID, start, end, models.InvoiceStatusPaid).
-		Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+		Select(selectExpr).
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -246,7 +251,7 @@ func (s *analyticsService) GetSummary(userID string, period AnalyticsPeriod) (*A
 	if err := s.db.Model(&models.Invoice{}).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND status = ?",
 			userID, start, end, models.InvoiceStatusUnpaid).
-		Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+		Select(selectExpr).
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -257,7 +262,7 @@ func (s *analyticsService) GetSummary(userID string, period AnalyticsPeriod) (*A
 	if err := s.db.Model(&models.Invoice{}).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND status = ?",
 			userID, start, end, models.InvoiceStatusOverdue).
-		Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+		Select(selectExpr).
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -296,9 +301,9 @@ func (s *analyticsService) GetByCategory(userID string, period AnalyticsPeriod) 
 			invoice_categories.name,
 			invoice_categories.color,
 			COUNT(invoices.id) as invoice_count,
-			COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, invoices.amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Joins("INNER JOIN invoice_categories ON invoices.category_id = invoice_categories.id").
 		Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL",
@@ -328,9 +333,9 @@ func (s *analyticsService) GetByCategory(userID string, period AnalyticsPeriod) 
 	err = s.db.Table("invoices").
 		Select(`
 			COUNT(id) as invoice_count,
-			COALESCE(SUM(COALESCE(target_amount, amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND category_id IS NULL AND deleted_at IS NULL",
 			userID, start, end).
@@ -380,9 +385,9 @@ func (s *analyticsService) GetByCompany(userID string, period AnalyticsPeriod) (
 			invoice_companies.id,
 			invoice_companies.name,
 			COUNT(invoices.id) as invoice_count,
-			COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, invoices.amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Joins("INNER JOIN invoice_companies ON invoices.company_id = invoice_companies.id").
 		Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL",
@@ -411,9 +416,9 @@ func (s *analyticsService) GetByCompany(userID string, period AnalyticsPeriod) (
 	err = s.db.Table("invoices").
 		Select(`
 			COUNT(id) as invoice_count,
-			COALESCE(SUM(COALESCE(target_amount, amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND company_id IS NULL AND deleted_at IS NULL",
 			userID, start, end).
@@ -463,9 +468,9 @@ func (s *analyticsService) GetByReceiver(userID string, period AnalyticsPeriod) 
 			invoice_receivers.id,
 			invoice_receivers.name,
 			COUNT(invoices.id) as invoice_count,
-			COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, invoices.amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Joins("INNER JOIN invoice_receivers ON invoices.receiver_id = invoice_receivers.id").
 		Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL",
@@ -494,9 +499,9 @@ func (s *analyticsService) GetByReceiver(userID string, period AnalyticsPeriod) 
 	err = s.db.Table("invoices").
 		Select(`
 			COUNT(id) as invoice_count,
-			COALESCE(SUM(COALESCE(target_amount, amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND receiver_id IS NULL AND deleted_at IS NULL",
 			userID, start, end).
@@ -548,9 +553,9 @@ func (s *analyticsService) GetByTag(userID string, period AnalyticsPeriod) (*Ana
 			invoice_tags.name,
 			invoice_tags.color,
 			COUNT(DISTINCT invoices.id) as invoice_count,
-			COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(invoices.target_amount, invoices.amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, invoices.amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN invoices.status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, invoices.amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Joins("INNER JOIN invoice_tag_mappings ON invoices.id = invoice_tag_mappings.invoice_id").
 		Joins("INNER JOIN invoice_tags ON invoice_tag_mappings.invoice_tag_id = invoice_tags.id").
@@ -581,9 +586,9 @@ func (s *analyticsService) GetByTag(userID string, period AnalyticsPeriod) (*Ana
 	err = s.db.Table("invoices").
 		Select(`
 			COUNT(id) as invoice_count,
-			COALESCE(SUM(COALESCE(target_amount, amount)), 0) as total_amount,
-			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as paid_amount,
-			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(target_amount, amount) ELSE 0 END), 0) as unpaid_amount
+			COALESCE(SUM(COALESCE(`+itemTargetAmountSubquery+`, amount)), 0) as total_amount,
+			COALESCE(SUM(CASE WHEN status = 'paid' THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as paid_amount,
+			COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN COALESCE(`+itemTargetAmountSubquery+`, amount) ELSE 0 END), 0) as unpaid_amount
 		`).
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND deleted_at IS NULL", userID, start, end).
 		Where("id NOT IN (SELECT invoice_id FROM invoice_tag_mappings)").
@@ -681,13 +686,14 @@ func (s *analyticsService) GetStatistics(userID string, opts StatisticsOptions) 
 		},
 	}
 
-	// Get total count and amount (use target_amount for USD normalization)
+	// Get total count and amount (calculate from invoice_items.target_amount)
 	var result struct {
 		Count  int64
 		Amount float64
 	}
+	selectExpr := "COUNT(*) as count, COALESCE(SUM(COALESCE(" + itemTargetAmountSubquery + ", amount)), 0) as amount"
 	if err := s.buildStatisticsQuery(userID, start, end, opts).
-		Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+		Select(selectExpr).
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -756,6 +762,7 @@ func (s *analyticsService) GetStatistics(userID string, opts StatisticsOptions) 
 // getStatusBreakdown returns breakdown by status
 func (s *analyticsService) getStatusBreakdown(userID string, start, end time.Time, opts StatisticsOptions) (*StatusBreakdown, error) {
 	breakdown := &StatusBreakdown{}
+	selectExpr := "COUNT(*) as count, COALESCE(SUM(COALESCE(" + itemTargetAmountSubquery + ", amount)), 0) as amount"
 
 	var result struct {
 		Count  int64
@@ -767,7 +774,7 @@ func (s *analyticsService) getStatusBreakdown(userID string, start, end time.Tim
 	paidStatus := models.InvoiceStatusPaid
 	paidOpts.Status = &paidStatus
 	if err := s.buildStatisticsQuery(userID, start, end, paidOpts).
-		Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+		Select(selectExpr).
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -778,7 +785,7 @@ func (s *analyticsService) getStatusBreakdown(userID string, start, end time.Tim
 	unpaidStatus := models.InvoiceStatusUnpaid
 	unpaidOpts.Status = &unpaidStatus
 	if err := s.buildStatisticsQuery(userID, start, end, unpaidOpts).
-		Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+		Select(selectExpr).
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -789,7 +796,7 @@ func (s *analyticsService) getStatusBreakdown(userID string, start, end time.Tim
 	overdueStatus := models.InvoiceStatusOverdue
 	overdueOpts.Status = &overdueStatus
 	if err := s.buildStatisticsQuery(userID, start, end, overdueOpts).
-		Select("COUNT(*) as count, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+		Select(selectExpr).
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -809,7 +816,7 @@ func (s *analyticsService) getGroupedByDay(userID string, start, end time.Time, 
 	var results []dayResult
 
 	query := s.db.Table("invoices").
-		Select("DATE(COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount, COUNT(*) as count").
+		Select("DATE(COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", amount)), 0) as amount, COUNT(*) as count").
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND deleted_at IS NULL", userID, start, end)
 
 	if opts.CategoryID != nil {
@@ -873,7 +880,7 @@ func (s *analyticsService) getGroupedByWeek(userID string, start, end time.Time,
 
 	// Use strftime to get week start (Monday)
 	query := s.db.Table("invoices").
-		Select("strftime('%Y-%W', COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount, COUNT(*) as count").
+		Select("strftime('%Y-%W', COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", amount)), 0) as amount, COUNT(*) as count").
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND deleted_at IS NULL", userID, start, end)
 
 	if opts.CategoryID != nil {
@@ -920,7 +927,7 @@ func (s *analyticsService) getGroupedByMonth(userID string, start, end time.Time
 	var results []monthResult
 
 	query := s.db.Table("invoices").
-		Select("strftime('%Y-%m', COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount, COUNT(*) as count").
+		Select("strftime('%Y-%m', COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", amount)), 0) as amount, COUNT(*) as count").
 		Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND deleted_at IS NULL", userID, start, end)
 
 	if opts.CategoryID != nil {
@@ -968,7 +975,7 @@ func (s *analyticsService) getGroupedByCategory(userID string, start, end time.T
 	var results []categoryResult
 
 	query := s.db.Table("invoices").
-		Select("invoice_categories.id, invoice_categories.name, COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as amount, COUNT(invoices.id) as count").
+		Select("invoice_categories.id, invoice_categories.name, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", invoices.amount)), 0) as amount, COUNT(invoices.id) as count").
 		Joins("LEFT JOIN invoice_categories ON invoices.category_id = invoice_categories.id").
 		Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL", userID, start, end)
 
@@ -1022,7 +1029,7 @@ func (s *analyticsService) getGroupedByCompany(userID string, start, end time.Ti
 	var results []companyResult
 
 	query := s.db.Table("invoices").
-		Select("invoice_companies.id, invoice_companies.name, COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as amount, COUNT(invoices.id) as count").
+		Select("invoice_companies.id, invoice_companies.name, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", invoices.amount)), 0) as amount, COUNT(invoices.id) as count").
 		Joins("LEFT JOIN invoice_companies ON invoices.company_id = invoice_companies.id").
 		Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL", userID, start, end)
 
@@ -1076,7 +1083,7 @@ func (s *analyticsService) getGroupedByReceiver(userID string, start, end time.T
 	var results []receiverResult
 
 	query := s.db.Table("invoices").
-		Select("invoice_receivers.id, invoice_receivers.name, COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as amount, COUNT(invoices.id) as count").
+		Select("invoice_receivers.id, invoice_receivers.name, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", invoices.amount)), 0) as amount, COUNT(invoices.id) as count").
 		Joins("LEFT JOIN invoice_receivers ON invoices.receiver_id = invoice_receivers.id").
 		Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL", userID, start, end)
 
@@ -1129,7 +1136,7 @@ func (s *analyticsService) getAggregations(userID string, start, end time.Time, 
 	}
 
 	if err := s.buildStatisticsQuery(userID, start, end, opts).
-		Select("COALESCE(MAX(COALESCE(target_amount, amount)), 0) as max_amount, COALESCE(MIN(COALESCE(target_amount, amount)), 0) as min_amount, COALESCE(AVG(COALESCE(target_amount, amount)), 0) as avg_amount").
+		Select("COALESCE(MAX(COALESCE(" + itemTargetAmountSubquery + ", amount)), 0) as max_amount, COALESCE(MIN(COALESCE(" + itemTargetAmountSubquery + ", amount)), 0) as min_amount, COALESCE(AVG(COALESCE(" + itemTargetAmountSubquery + ", amount)), 0) as avg_amount").
 		Scan(&result).Error; err != nil {
 		return nil, err
 	}
@@ -1141,7 +1148,7 @@ func (s *analyticsService) getAggregations(userID string, start, end time.Time, 
 	// Get max invoice reference (by target_amount for USD normalization)
 	var maxInvoice models.Invoice
 	if err := s.buildStatisticsQuery(userID, start, end, opts).
-		Order("COALESCE(target_amount, amount) DESC").
+		Order("COALESCE(" + itemTargetAmountSubquery + ", amount) DESC").
 		Limit(1).
 		Find(&maxInvoice).Error; err != nil {
 		return nil, err
@@ -1162,7 +1169,7 @@ func (s *analyticsService) getAggregations(userID string, start, end time.Time, 
 		var maxDay dayResult
 
 		query := s.db.Table("invoices").
-			Select("DATE(COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE(target_amount, amount)), 0) as amount").
+			Select("DATE(COALESCE(due_date, created_at)) as date, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", amount)), 0) as amount").
 			Where("user_id = ? AND COALESCE(due_date, created_at) >= ? AND COALESCE(due_date, created_at) <= ? AND deleted_at IS NULL", userID, start, end)
 
 		if opts.CategoryID != nil {
@@ -1203,7 +1210,7 @@ func (s *analyticsService) getAggregations(userID string, start, end time.Time, 
 		var maxCat catResult
 
 		query := s.db.Table("invoices").
-			Select("invoice_categories.id, invoice_categories.name, COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as amount").
+			Select("invoice_categories.id, invoice_categories.name, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", invoices.amount)), 0) as amount").
 			Joins("LEFT JOIN invoice_categories ON invoices.category_id = invoice_categories.id").
 			Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL", userID, start, end)
 
@@ -1243,7 +1250,7 @@ func (s *analyticsService) getAggregations(userID string, start, end time.Time, 
 		var maxComp compResult
 
 		query := s.db.Table("invoices").
-			Select("invoice_companies.id, invoice_companies.name, COALESCE(SUM(COALESCE(invoices.target_amount, invoices.amount)), 0) as amount").
+			Select("invoice_companies.id, invoice_companies.name, COALESCE(SUM(COALESCE("+itemTargetAmountSubquery+", invoices.amount)), 0) as amount").
 			Joins("LEFT JOIN invoice_companies ON invoices.company_id = invoice_companies.id").
 			Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL", userID, start, end)
 

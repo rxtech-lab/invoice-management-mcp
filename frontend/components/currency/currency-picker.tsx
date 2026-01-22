@@ -32,7 +32,7 @@ export function CurrencyPicker({
           onChange(val === "original" ? null : (val as CurrencyCode))
         }
       >
-        <SelectTrigger className="w-[160px] h-8">
+        <SelectTrigger className="w-40 h-8">
           {isLoading ? (
             <RefreshCw className="h-4 w-4 animate-spin" />
           ) : (

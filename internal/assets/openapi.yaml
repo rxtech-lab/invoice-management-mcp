@@ -1652,6 +1652,10 @@ components:
           type: number
           format: double
           description: Total amount (calculated from invoice items, read-only)
+        target_amount:
+          type: number
+          format: double
+          description: USD-normalized total amount (calculated from invoice items' target_amount, read-only)
         currency:
           type: string
           description: Currency code (e.g., USD)

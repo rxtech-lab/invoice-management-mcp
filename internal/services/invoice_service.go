@@ -77,15 +77,12 @@ func (s *invoiceService) CreateInvoice(userID string, invoice *models.Invoice) (
 
 	// Calculate item amounts, target amounts, and totals
 	var totalAmount float64
-	var totalTargetAmount float64
 	for i := range invoice.Items {
 		invoice.Items[i].CalculateAmount()
 		s.calculateItemTargetAmount(&invoice.Items[i], invoice.Currency)
 		totalAmount += invoice.Items[i].Amount
-		totalTargetAmount += invoice.Items[i].TargetAmount
 	}
 	invoice.Amount = totalAmount
-	invoice.TargetAmount = totalTargetAmount
 
 	// Check for duplicate invoice
 	var existing models.Invoice
@@ -446,16 +443,14 @@ func (s *invoiceService) GetOverdueInvoices(userID string) ([]models.Invoice, er
 	return invoices, err
 }
 
-// updateInvoiceTotal recalculates and updates the invoice total from items
-// Sums both amount and target_amount from items
+// updateInvoiceTotal recalculates and updates the invoice total amount from items
 func (s *invoiceService) updateInvoiceTotal(tx *gorm.DB, invoiceID uint) error {
 	var result struct {
-		TotalAmount       float64
-		TotalTargetAmount float64
+		TotalAmount float64
 	}
 	err := tx.Model(&models.InvoiceItem{}).
 		Where("invoice_id = ?", invoiceID).
-		Select("COALESCE(SUM(amount), 0) as total_amount, COALESCE(SUM(target_amount), 0) as total_target_amount").
+		Select("COALESCE(SUM(amount), 0) as total_amount").
 		Scan(&result).Error
 	if err != nil {
 		return err
@@ -464,10 +459,7 @@ func (s *invoiceService) updateInvoiceTotal(tx *gorm.DB, invoiceID uint) error {
 	// Save updates
 	return tx.Model(&models.Invoice{}).
 		Where("id = ?", invoiceID).
-		Updates(map[string]interface{}{
-			"amount":        result.TotalAmount,
-			"target_amount": result.TotalTargetAmount,
-		}).Error
+		Update("amount", result.TotalAmount).Error
 }
 
 // recalculateAllItemFX recalculates FX for all items when currency changes
@@ -479,10 +471,8 @@ func (s *invoiceService) recalculateAllItemFX(tx *gorm.DB, invoiceID uint, curre
 	}
 
 	// Recalculate FX for each item
-	var totalTargetAmount float64
 	for i := range items {
 		s.calculateItemTargetAmount(&items[i], currency)
-		totalTargetAmount += items[i].TargetAmount
 
 		// Update item
 		if err := tx.Model(&models.InvoiceItem{}).
@@ -496,10 +486,7 @@ func (s *invoiceService) recalculateAllItemFX(tx *gorm.DB, invoiceID uint, curre
 		}
 	}
 
-	// Update invoice target_amount
-	return tx.Model(&models.Invoice{}).
-		Where("id = ?", invoiceID).
-		Update("target_amount", totalTargetAmount).Error
+	return nil
 }
 
 // SetInvoiceTags sets the tags for an invoice by tag names
