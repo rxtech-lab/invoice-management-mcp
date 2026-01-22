@@ -64,10 +64,18 @@ func companyListToGenerated(companies []models.InvoiceCompany) []generated.Compa
 // Receiver converters
 
 func receiverModelToGenerated(rec *models.InvoiceReceiver) generated.Receiver {
+	var otherNames *[]string
+	if len(rec.OtherNames) > 0 {
+		names := make([]string, len(rec.OtherNames))
+		copy(names, rec.OtherNames)
+		otherNames = &names
+	}
+
 	return generated.Receiver{
 		Id:             ptr(int(rec.ID)),
 		UserId:         ptr(rec.UserID),
 		Name:           ptr(rec.Name),
+		OtherNames:     otherNames,
 		IsOrganization: ptr(rec.IsOrganization),
 		CreatedAt:      ptr(rec.CreatedAt),
 		UpdatedAt:      ptr(rec.UpdatedAt),

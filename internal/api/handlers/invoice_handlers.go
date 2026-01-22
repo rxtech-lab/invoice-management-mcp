@@ -137,19 +137,25 @@ func (h *StrictHandlers) CreateInvoice(
 		}
 	}
 
-	if err := h.invoiceService.CreateInvoice(userID, invoice); err != nil {
+	result, err := h.invoiceService.CreateInvoice(userID, invoice)
+	if err != nil {
 		return generated.CreateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
 	}
 
-	// Set tags if provided
+	// If duplicate found, return existing invoice
+	if result.IsDuplicate {
+		return generated.CreateInvoice201JSONResponse(invoiceModelToGenerated(result.Invoice)), nil
+	}
+
+	// Set tags if provided (only for newly created invoices)
 	if request.Body.TagIds != nil && len(*request.Body.TagIds) > 0 {
-		if err := h.invoiceService.SetInvoiceTagsByID(userID, invoice.ID, *request.Body.TagIds); err != nil {
+		if err := h.invoiceService.SetInvoiceTagsByID(userID, result.Invoice.ID, *request.Body.TagIds); err != nil {
 			return generated.CreateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
 		}
 	}
 
 	// Reload to get relationships
-	created, _ := h.invoiceService.GetInvoiceByID(userID, invoice.ID)
+	created, _ := h.invoiceService.GetInvoiceByID(userID, result.Invoice.ID)
 	return generated.CreateInvoice201JSONResponse(invoiceModelToGenerated(created)), nil
 }
 

@@ -1,7 +1,9 @@
 package services
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/rxtech-lab/invoice-management/internal/models"
 	"gorm.io/gorm"
@@ -16,6 +18,7 @@ type ReceiverService interface {
 	DeleteReceiver(userID string, id uint) error
 	SearchReceivers(userID string, query string) ([]models.InvoiceReceiver, error)
 	MergeReceivers(userID string, targetID uint, sourceIDs []uint) (*models.InvoiceReceiver, int64, error)
+	FindByNameOrAlias(userID string, name string) (*models.InvoiceReceiver, error)
 }
 
 type receiverService struct {
@@ -89,6 +92,7 @@ func (s *receiverService) UpdateReceiver(userID string, receiver *models.Invoice
 	// Update fields
 	existing.Name = receiver.Name
 	existing.IsOrganization = receiver.IsOrganization
+	existing.OtherNames = receiver.OtherNames
 
 	return s.db.Save(existing).Error
 }
@@ -118,8 +122,45 @@ func (s *receiverService) SearchReceivers(userID string, query string) ([]models
 	return receivers, err
 }
 
+// FindByNameOrAlias finds a receiver by name or any of its aliases (other_names)
+func (s *receiverService) FindByNameOrAlias(userID string, name string) (*models.InvoiceReceiver, error) {
+	normalizedName := strings.TrimSpace(strings.ToLower(name))
+	if normalizedName == "" {
+		return nil, errors.New("name cannot be empty")
+	}
+
+	// First check primary name (case-insensitive)
+	var receiver models.InvoiceReceiver
+	err := s.db.Where("user_id = ? AND LOWER(name) = ?", userID, normalizedName).First(&receiver).Error
+	if err == nil {
+		return &receiver, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	// Search in other_names JSON array
+	// For SQLite/Turso, we need to fetch all receivers and check in Go
+	var receivers []models.InvoiceReceiver
+	err = s.db.Where("user_id = ?", userID).Find(&receivers).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range receivers {
+		for _, alias := range receivers[i].OtherNames {
+			if strings.ToLower(strings.TrimSpace(alias)) == normalizedName {
+				return &receivers[i], nil
+			}
+		}
+	}
+
+	return nil, gorm.ErrRecordNotFound
+}
+
 // MergeReceivers merges multiple receivers into a target receiver
 // All invoices from source receivers are moved to the target receiver
+// Source receiver names are preserved in target's other_names field
 // Source receivers are then soft-deleted
 // Returns the updated target receiver and count of affected invoices
 func (s *receiverService) MergeReceivers(userID string, targetID uint, sourceIDs []uint) (*models.InvoiceReceiver, int64, error) {
@@ -141,6 +182,35 @@ func (s *receiverService) MergeReceivers(userID string, targetID uint, sourceIDs
 
 		if len(sourceReceivers) != len(sourceIDs) {
 			return fmt.Errorf("some source receivers not found or don't belong to user")
+		}
+
+		// Collect names from source receivers to preserve as aliases
+		existingNames := make(map[string]bool)
+		existingNames[strings.ToLower(targetReceiver.Name)] = true
+		for _, name := range targetReceiver.OtherNames {
+			existingNames[strings.ToLower(name)] = true
+		}
+
+		newOtherNames := append([]string{}, targetReceiver.OtherNames...)
+		for _, src := range sourceReceivers {
+			// Add primary name if not already present
+			if !existingNames[strings.ToLower(src.Name)] {
+				newOtherNames = append(newOtherNames, src.Name)
+				existingNames[strings.ToLower(src.Name)] = true
+			}
+			// Add other_names if not already present
+			for _, alias := range src.OtherNames {
+				if !existingNames[strings.ToLower(alias)] {
+					newOtherNames = append(newOtherNames, alias)
+					existingNames[strings.ToLower(alias)] = true
+				}
+			}
+		}
+
+		// Update target receiver's other_names
+		targetReceiver.OtherNames = newOtherNames
+		if err := tx.Save(&targetReceiver).Error; err != nil {
+			return err
 		}
 
 		// Update all invoices from source receivers to target receiver

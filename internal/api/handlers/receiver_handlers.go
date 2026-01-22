@@ -99,6 +99,9 @@ func (h *StrictHandlers) UpdateReceiver(
 	if request.Body.IsOrganization != nil {
 		existing.IsOrganization = *request.Body.IsOrganization
 	}
+	if request.Body.OtherNames != nil {
+		existing.OtherNames = *request.Body.OtherNames
+	}
 
 	if err := h.receiverService.UpdateReceiver(userID, existing); err != nil {
 		return generated.UpdateReceiver400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
