@@ -39,7 +39,7 @@ export default async function InvoiceDetailPage({
       getCategories({ limit: 100 }),
       getCompanies({ limit: 100 }),
       getReceivers({ limit: 100 }),
-      getTags({ limit: 100 }),
+      getTags({ limit: 20 }), // Reduced limit - tags are now fetched server-side on search
     ]);
   } catch {
     notFound();

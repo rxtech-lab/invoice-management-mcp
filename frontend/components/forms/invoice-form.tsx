@@ -29,8 +29,10 @@ import {
 } from "@/lib/actions/invoice-actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { useDebounce } from "@uidotdev/usehooks";
+import { searchTagsAction } from "@/lib/actions/tag-actions";
 import { FileUpload } from "@/components/ui/file-upload";
 import {
   Combobox,
@@ -80,8 +82,31 @@ export function InvoiceForm({
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
+  const debouncedTagSearch = useDebounce(tagSearch, 300);
+  const [searchedTags, setSearchedTags] = useState<Tag[]>(tags);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
   const tagAnchorRef = useComboboxAnchor();
   const isEditing = !!invoice;
+
+  // Fetch tags from server when debounced search changes
+  useEffect(() => {
+    const fetchTags = async () => {
+      setIsLoadingTags(true);
+      try {
+        const response = await searchTagsAction(
+          debouncedTagSearch || undefined,
+          20,
+        );
+        setSearchedTags(response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch tags:", error);
+        setSearchedTags([]);
+      } finally {
+        setIsLoadingTags(false);
+      }
+    };
+    fetchTags();
+  }, [debouncedTagSearch]);
 
   const {
     register,
@@ -110,6 +135,22 @@ export function InvoiceForm({
       original_download_link: invoice?.original_download_link || "",
     },
   });
+
+  // Combine searched tags with selected tags to ensure selected tags are always visible
+  const selectedTagIds = watch("tag_ids") || [];
+  const displayTags = useMemo(() => {
+    const selectedTags = tags.filter((t) => selectedTagIds.includes(t.id));
+    const allTags = [...searchedTags];
+
+    // Add selected tags that aren't in search results
+    selectedTags.forEach((selectedTag) => {
+      if (!allTags.find((t) => t.id === selectedTag.id)) {
+        allTags.push(selectedTag);
+      }
+    });
+
+    return allTags;
+  }, [searchedTags, tags, selectedTagIds]);
 
   const onSubmit = async (data: InvoiceFormData) => {
     setIsSubmitting(true);
@@ -313,20 +354,19 @@ export function InvoiceForm({
               </ComboboxChips>
               <ComboboxContent anchor={tagAnchorRef}>
                 <ComboboxList>
-                  <ComboboxEmpty>No tags found</ComboboxEmpty>
-                  {tags
-                    .filter((tag) =>
-                      tag.name.toLowerCase().includes(tagSearch.toLowerCase()),
-                    )
-                    .map((tag) => (
-                      <ComboboxItem key={tag.id} value={tag.id}>
-                        <div
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: tag.color }}
-                        />
-                        {tag.name}
-                      </ComboboxItem>
-                    ))}
+                  {!isLoadingTags && displayTags.length === 0 && (
+                    <ComboboxEmpty>No tags found</ComboboxEmpty>
+                  )}
+                  {isLoadingTags && <ComboboxEmpty>Loading...</ComboboxEmpty>}
+                  {displayTags.map((tag) => (
+                    <ComboboxItem key={tag.id} value={tag.id}>
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </ComboboxItem>
+                  ))}
                 </ComboboxList>
               </ComboboxContent>
             </Combobox>

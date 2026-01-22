@@ -121,11 +121,23 @@ func invoiceModelToGenerated(inv *models.Invoice) generated.Invoice {
 		receiver = &rec
 	}
 
-	// Convert items
+	// Convert items and calculate target_amount from items
 	var items *[]generated.InvoiceItem
+	var targetAmount float64
 	if len(inv.Items) > 0 {
 		itemList := invoiceItemListToGenerated(inv.Items)
 		items = &itemList
+		// Calculate USD-normalized total from item target_amounts
+		for _, item := range inv.Items {
+			if item.TargetAmount > 0 {
+				targetAmount += item.TargetAmount
+			} else {
+				targetAmount += item.Amount
+			}
+		}
+	} else {
+		// Fallback to invoice amount if no items
+		targetAmount = inv.Amount
 	}
 
 	// Convert tags - include id and name
@@ -156,6 +168,7 @@ func invoiceModelToGenerated(inv *models.Invoice) generated.Invoice {
 		InvoiceStartedAt:     inv.InvoiceStartedAt,
 		InvoiceEndedAt:       inv.InvoiceEndedAt,
 		Amount:               ptr(inv.Amount),
+		TargetAmount:         ptr(targetAmount),
 		Currency:             ptr(inv.Currency),
 		CategoryId:           categoryID,
 		Category:             category,

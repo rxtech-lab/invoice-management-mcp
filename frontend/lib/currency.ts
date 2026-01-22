@@ -10,6 +10,7 @@ export const DISPLAY_CURRENCIES = [
   { code: "CHF", name: "Swiss Franc", symbol: "CHF" },
   { code: "INR", name: "Indian Rupee", symbol: "₹" },
   { code: "MXN", name: "Mexican Peso", symbol: "$" },
+  { code: "HKD", name: "Hong Kong Dollar", symbol: "HK$" },
 ] as const;
 
 export type CurrencyCode = (typeof DISPLAY_CURRENCIES)[number]["code"];

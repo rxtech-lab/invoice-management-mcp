@@ -36,9 +36,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
         category_id: params.category_id
           ? parseInt(params.category_id)
           : undefined,
-        company_id: params.company_id
-          ? parseInt(params.company_id)
-          : undefined,
+        company_id: params.company_id ? parseInt(params.company_id) : undefined,
         receiver_id: params.receiver_id
           ? parseInt(params.receiver_id)
           : undefined,
@@ -49,7 +47,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
       getCategories({ limit: 100 }),
       getCompanies({ limit: 100 }),
       getReceivers({ limit: 100 }),
-      getTags({ limit: 100 }),
+      getTags({ limit: 20 }), // Reduced limit - tags are now fetched server-side on search
     ]);
 
   const invoices = invoicesRes.data || [];
