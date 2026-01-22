@@ -44,9 +44,9 @@ func (t *CreateReceiverTool) GetHandler() server.ToolHandlerFunc {
 		if err == nil && existingReceiver != nil {
 			// Found an existing receiver - return it instead of creating duplicate
 			result, _ := json.Marshal(map[string]interface{}{
-				"duplicate_found":    true,
-				"existing_receiver":  existingReceiver,
-				"message":            fmt.Sprintf("A receiver with name '%s' already exists (or is an alias of receiver '%s'). Use the existing receiver instead.", name, existingReceiver.Name),
+				"duplicate_found":   true,
+				"existing_receiver": existingReceiver,
+				"message":           fmt.Sprintf("A receiver with name '%s' already exists (or is an alias of receiver '%s'). Use the existing receiver instead.", name, existingReceiver.Name),
 			})
 			return mcp.NewToolResultText(string(result)), nil
 		}

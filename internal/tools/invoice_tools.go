@@ -23,7 +23,7 @@ func NewCreateInvoiceTool(service services.InvoiceService) *CreateInvoiceTool {
 
 func (t *CreateInvoiceTool) GetTool() mcp.Tool {
 	return mcp.NewTool("create_invoice",
-		mcp.WithDescription("Create a new invoice. Note: amount is calculated from invoice items, use add_invoice_item to add items. You can assign tags to categorize and label the invoice for better organization and filtering."),
+		mcp.WithDescription("Create a new invoice with items. Amount is calculated from invoice items. Duplicate detection: if an invoice with the same amount, billing dates, and receiver already exists, the existing invoice will be returned instead of creating a duplicate."),
 		mcp.WithString("title", mcp.Required(), mcp.Description("Invoice title")),
 		mcp.WithString("description", mcp.Description("Invoice description")),
 		mcp.WithNumber("receiver_id", mcp.Description("Receiver ID")),
@@ -35,6 +35,16 @@ func (t *CreateInvoiceTool) GetTool() mcp.Tool {
 		mcp.WithString("original_download_link", mcp.Description("Link to original invoice file")),
 		mcp.WithString("status", mcp.Description("Status: paid, unpaid, overdue (default: paid). Please justify the status base on the pdf file and the invoice items.")),
 		mcp.WithString("due_date", mcp.Description("Due date (RFC3339)")),
+		mcp.WithArray("items", mcp.Description("Invoice items array. Each item should have: description (string, required), quantity (number, default 1), unit_price (number, required). Example: [{\"description\": \"Service\", \"quantity\": 1, \"unit_price\": 100}]"),
+			mcp.Items(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"description": map[string]any{"type": "string"},
+					"quantity":    map[string]any{"type": "number"},
+					"unit_price":  map[string]any{"type": "number"},
+				},
+				"required": []string{"description", "unit_price"},
+			})),
 		mcp.WithArray("tags", mcp.Description("Tag names to assign to the invoice (e.g., ['travel', 'business', 'Q1-2024']). Tags will be created if they don't exist."), mcp.Items(map[string]any{"type": "string"})),
 	)
 }
@@ -69,7 +79,7 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 		invoiceEndedAt := parseTimeArg(args, "invoice_ended_at")
 		dueDate := parseTimeArg(args, "due_date")
 
-		// Note: Amount is not set here - it's calculated from invoice items
+		// Create invoice with items - amount is calculated from items
 		invoice := &models.Invoice{
 			Title:                title,
 			Description:          description,
@@ -82,6 +92,23 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 			OriginalDownloadLink: originalDownloadLink,
 			Status:               status,
 			DueDate:              dueDate,
+		}
+
+		// Parse and add items if provided
+		if itemsRaw, ok := args["items"].([]interface{}); ok && len(itemsRaw) > 0 {
+			for _, itemRaw := range itemsRaw {
+				if itemMap, ok := itemRaw.(map[string]interface{}); ok {
+					item := models.InvoiceItem{
+						Description: getStringFromMap(itemMap, "description"),
+						Quantity:    getFloatFromMap(itemMap, "quantity", 1),
+						UnitPrice:   getFloatFromMap(itemMap, "unit_price", 0),
+					}
+					if item.Quantity == 0 {
+						item.Quantity = 1
+					}
+					invoice.Items = append(invoice.Items, item)
+				}
+			}
 		}
 
 		createResult, err := t.service.CreateInvoice(userID, invoice)
@@ -473,4 +500,20 @@ func parseTimeArg(args map[string]interface{}, key string) *time.Time {
 		}
 	}
 	return nil
+}
+
+// getStringFromMap extracts a string value from a map
+func getStringFromMap(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// getFloatFromMap extracts a float64 value from a map with a default value
+func getFloatFromMap(m map[string]interface{}, key string, defaultVal float64) float64 {
+	if v, ok := m[key].(float64); ok {
+		return v
+	}
+	return defaultVal
 }
