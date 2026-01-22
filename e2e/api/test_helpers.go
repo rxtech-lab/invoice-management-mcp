@@ -68,6 +68,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 		fileUploadService,
 		analyticsService,
 		fileUnlinkService,
+		nil, // No PDF service for tests
 		nil, // No MCP server for tests
 	)
 
@@ -428,6 +429,7 @@ func NewTestSetupWithFileServer(t *testing.T, fileServerURL string, withOAuth bo
 		fileUploadService,
 		analyticsService,
 		fileUnlinkService,
+		nil, // No PDF service for tests
 		nil, // No MCP server for tests
 	)
 

@@ -133,6 +133,9 @@ type ServerInterface interface {
 	// Upload file
 	// (POST /api/upload)
 	UploadFile(c *fiber.Ctx) error
+	// Convert HTML to PDF and upload
+	// (POST /api/upload/html-to-pdf)
+	UploadHtmlToPdf(c *fiber.Ctx) error
 	// Get presigned upload URL
 	// (GET /api/upload/presigned)
 	GetPresignedURL(c *fiber.Ctx, params GetPresignedURLParams) error
@@ -1081,6 +1084,16 @@ func (siw *ServerInterfaceWrapper) UploadFile(c *fiber.Ctx) error {
 	return siw.Handler.UploadFile(c)
 }
 
+// UploadHtmlToPdf operation middleware
+func (siw *ServerInterfaceWrapper) UploadHtmlToPdf(c *fiber.Ctx) error {
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.UploadHtmlToPdf(c)
+}
+
 // GetPresignedURL operation middleware
 func (siw *ServerInterfaceWrapper) GetPresignedURL(c *fiber.Ctx) error {
 
@@ -1228,6 +1241,8 @@ func RegisterHandlersWithOptions(router fiber.Router, si ServerInterface, option
 	router.Put(options.BaseURL+"/api/tags/:id", wrapper.UpdateTag)
 
 	router.Post(options.BaseURL+"/api/upload", wrapper.UploadFile)
+
+	router.Post(options.BaseURL+"/api/upload/html-to-pdf", wrapper.UploadHtmlToPdf)
 
 	router.Get(options.BaseURL+"/api/upload/presigned", wrapper.GetPresignedURL)
 
@@ -2540,6 +2555,50 @@ func (response UploadFile401JSONResponse) VisitUploadFileResponse(ctx *fiber.Ctx
 	return ctx.JSON(&response)
 }
 
+type UploadHtmlToPdfRequestObject struct {
+	Body *UploadHtmlToPdfJSONRequestBody
+}
+
+type UploadHtmlToPdfResponseObject interface {
+	VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error
+}
+
+type UploadHtmlToPdf201JSONResponse UploadResponse
+
+func (response UploadHtmlToPdf201JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(201)
+
+	return ctx.JSON(&response)
+}
+
+type UploadHtmlToPdf400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UploadHtmlToPdf400JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type UploadHtmlToPdf401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UploadHtmlToPdf401JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
+type UploadHtmlToPdf500JSONResponse Error
+
+func (response UploadHtmlToPdf500JSONResponse) VisitUploadHtmlToPdfResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(500)
+
+	return ctx.JSON(&response)
+}
+
 type GetPresignedURLRequestObject struct {
 	Params GetPresignedURLParams
 }
@@ -2712,6 +2771,9 @@ type StrictServerInterface interface {
 	// Upload file
 	// (POST /api/upload)
 	UploadFile(ctx context.Context, request UploadFileRequestObject) (UploadFileResponseObject, error)
+	// Convert HTML to PDF and upload
+	// (POST /api/upload/html-to-pdf)
+	UploadHtmlToPdf(ctx context.Context, request UploadHtmlToPdfRequestObject) (UploadHtmlToPdfResponseObject, error)
 	// Get presigned upload URL
 	// (GET /api/upload/presigned)
 	GetPresignedURL(ctx context.Context, request GetPresignedURLRequestObject) (GetPresignedURLResponseObject, error)
@@ -3859,6 +3921,37 @@ func (sh *strictHandler) UploadFile(ctx *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	} else if validResponse, ok := response.(UploadFileResponseObject); ok {
 		if err := validResponse.VisitUploadFileResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UploadHtmlToPdf operation middleware
+func (sh *strictHandler) UploadHtmlToPdf(ctx *fiber.Ctx) error {
+	var request UploadHtmlToPdfRequestObject
+
+	var body UploadHtmlToPdfJSONRequestBody
+	if err := ctx.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	request.Body = &body
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadHtmlToPdf(ctx.UserContext(), request.(UploadHtmlToPdfRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadHtmlToPdf")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(UploadHtmlToPdfResponseObject); ok {
+		if err := validResponse.VisitUploadHtmlToPdfResponse(ctx); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 	} else if response != nil {

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Category } from "@/lib/api/types";
 import { createCategoryAction, updateCategoryAction } from "@/lib/actions/category-actions";
 import { toast } from "sonner";
@@ -26,18 +27,6 @@ const categorySchema = z.object({
 });
 
 type CategoryFormData = z.infer<typeof categorySchema>;
-
-const presetColors = [
-  "#EF4444", // Red
-  "#F97316", // Orange
-  "#EAB308", // Yellow
-  "#22C55E", // Green
-  "#14B8A6", // Teal
-  "#3B82F6", // Blue
-  "#8B5CF6", // Violet
-  "#EC4899", // Pink
-  "#6B7280", // Gray
-];
 
 interface CategoryFormProps {
   category?: Category;
@@ -115,38 +104,14 @@ export function CategoryForm({ category }: CategoryFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="color">Color</Label>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div
-                  className="h-10 w-10 rounded-md border"
-                  style={{ backgroundColor: selectedColor || "#e5e7eb" }}
-                />
-                <Input
-                  id="color"
-                  {...register("color")}
-                  placeholder="#FF5733"
-                  className="flex-1"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {presetColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`h-8 w-8 rounded-md border-2 transition-transform hover:scale-110 ${
-                      selectedColor === color
-                        ? "border-foreground"
-                        : "border-transparent"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setValue("color", color)}
-                  />
-                ))}
-              </div>
-              {errors.color && (
-                <p className="text-sm text-destructive">{errors.color.message}</p>
-              )}
-            </div>
+            <ColorPicker
+              value={selectedColor || ""}
+              onChange={(color) => setValue("color", color)}
+              defaultColor="#6B7280"
+            />
+            {errors.color && (
+              <p className="text-sm text-destructive">{errors.color.message}</p>
+            )}
           </div>
 
           <div className="flex gap-4">

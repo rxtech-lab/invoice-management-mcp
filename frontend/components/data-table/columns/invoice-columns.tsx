@@ -72,9 +72,9 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
       }
 
       return (
-        <Tooltip>
+        <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>{titleLink}</TooltipTrigger>
-          <TooltipContent>
+          <TooltipContent className="pointer-events-none">
             <div className="flex flex-wrap gap-1">
               {tags.map((tag, index) => (
                 <span

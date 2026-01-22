@@ -922,6 +922,37 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/upload/html-to-pdf:
+    post:
+      tags:
+        - Upload
+      summary: Convert HTML to PDF and upload
+      description: Accepts HTML content, sanitizes it, converts to PDF using headless Chrome, and uploads to S3-compatible storage
+      operationId: uploadHtmlToPdf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HtmlToPdfRequest'
+      responses:
+        '201':
+          description: PDF generated and uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: PDF conversion failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/files/{key}/download:
     get:
       tags:
@@ -1775,6 +1806,45 @@ components:
           type: integer
         offset:
           type: integer
+
+    HtmlToPdfRequest:
+      type: object
+      required:
+        - html
+      properties:
+        html:
+          type: string
+          description: HTML content to convert to PDF
+        filename:
+          type: string
+          description: Output filename, defaults to generated.pdf
+        paper_width:
+          type: number
+          format: double
+          description: Paper width in inches, defaults to 8.5
+        paper_height:
+          type: number
+          format: double
+          description: Paper height in inches, defaults to 11
+        margin_top:
+          type: number
+          format: double
+          description: Top margin in inches, defaults to 0.4
+        margin_bottom:
+          type: number
+          format: double
+          description: Bottom margin in inches, defaults to 0.4
+        margin_left:
+          type: number
+          format: double
+          description: Left margin in inches, defaults to 0.4
+        margin_right:
+          type: number
+          format: double
+          description: Right margin in inches, defaults to 0.4
+        landscape:
+          type: boolean
+          description: Landscape orientation, defaults to false
 
     UploadResponse:
       type: object

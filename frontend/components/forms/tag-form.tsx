@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Tag } from "@/lib/api/types";
 import { createTagAction, updateTagAction } from "@/lib/actions/tag-actions";
 import { toast } from "sonner";
@@ -24,18 +25,6 @@ const tagSchema = z.object({
 });
 
 type TagFormData = z.infer<typeof tagSchema>;
-
-const presetColors = [
-  "#EF4444", // Red
-  "#F97316", // Orange
-  "#EAB308", // Yellow
-  "#22C55E", // Green
-  "#14B8A6", // Teal
-  "#3B82F6", // Blue
-  "#8B5CF6", // Violet
-  "#EC4899", // Pink
-  "#6B7280", // Gray
-];
 
 interface TagFormProps {
   tag?: Tag;
@@ -102,38 +91,14 @@ export function TagForm({ tag }: TagFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="color">Color</Label>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div
-                  className="h-10 w-10 rounded-md border"
-                  style={{ backgroundColor: selectedColor || "#6B7280" }}
-                />
-                <Input
-                  id="color"
-                  {...register("color")}
-                  placeholder="#FF5733"
-                  className="flex-1"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {presetColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`h-8 w-8 rounded-md border-2 transition-transform hover:scale-110 ${
-                      selectedColor === color
-                        ? "border-foreground"
-                        : "border-transparent"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setValue("color", color)}
-                  />
-                ))}
-              </div>
-              {errors.color && (
-                <p className="text-sm text-destructive">{errors.color.message}</p>
-              )}
-            </div>
+            <ColorPicker
+              value={selectedColor || ""}
+              onChange={(color) => setValue("color", color)}
+              defaultColor="#6B7280"
+            />
+            {errors.color && (
+              <p className="text-sm text-destructive">{errors.color.message}</p>
+            )}
           </div>
 
           <div className="flex gap-4">

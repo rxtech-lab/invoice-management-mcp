@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/rxtech-lab/invoice-management/internal/api/generated"
+	"github.com/rxtech-lab/invoice-management/internal/services"
 )
 
 // UploadFile implements generated.StrictServerInterface
@@ -139,5 +141,93 @@ func (h *StrictHandlers) GetFileDownloadURL(
 		Key:         ptr(request.Key),
 		Filename:    ptr(fileUpload.Filename),
 		ExpiresAt:   ptr(expiresAt),
+	}, nil
+}
+
+// UploadHtmlToPdf implements generated.StrictServerInterface
+func (h *StrictHandlers) UploadHtmlToPdf(
+	ctx context.Context,
+	request generated.UploadHtmlToPdfRequestObject,
+) (generated.UploadHtmlToPdfResponseObject, error) {
+	userID, err := getUserID(ctx)
+	if err != nil {
+		return generated.UploadHtmlToPdf401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
+	}
+
+	if request.Body == nil || request.Body.Html == "" {
+		return generated.UploadHtmlToPdf400JSONResponse{BadRequestJSONResponse: badRequest("HTML content is required")}, nil
+	}
+
+	// Check if PDF service is available
+	if h.pdfService == nil {
+		return generated.UploadHtmlToPdf500JSONResponse{Error: ptr("PDF service not configured")}, nil
+	}
+
+	// Build PDF conversion options
+	options := services.DefaultPDFOptions()
+	if request.Body.PaperWidth != nil {
+		options.PaperWidth = *request.Body.PaperWidth
+	}
+	if request.Body.PaperHeight != nil {
+		options.PaperHeight = *request.Body.PaperHeight
+	}
+	if request.Body.MarginTop != nil {
+		options.MarginTop = *request.Body.MarginTop
+	}
+	if request.Body.MarginBottom != nil {
+		options.MarginBottom = *request.Body.MarginBottom
+	}
+	if request.Body.MarginLeft != nil {
+		options.MarginLeft = *request.Body.MarginLeft
+	}
+	if request.Body.MarginRight != nil {
+		options.MarginRight = *request.Body.MarginRight
+	}
+	if request.Body.Landscape != nil {
+		options.Landscape = *request.Body.Landscape
+	}
+
+	// Convert HTML to PDF (sanitization happens inside the service)
+	pdfContent, err := h.pdfService.ConvertHTMLToPDF(ctx, request.Body.Html, options)
+	if err != nil {
+		return generated.UploadHtmlToPdf500JSONResponse{Error: ptr("Failed to convert HTML to PDF: " + err.Error())}, nil
+	}
+
+	// Generate filename
+	filename := "generated.pdf"
+	if request.Body.Filename != nil && *request.Body.Filename != "" {
+		filename = *request.Body.Filename
+		if !strings.HasSuffix(strings.ToLower(filename), ".pdf") {
+			filename += ".pdf"
+		}
+	}
+
+	// Upload to S3
+	contentType := "application/pdf"
+	key, err := h.uploadService.UploadFile(ctx, userID, filename, pdfContent, contentType)
+	if err != nil {
+		return generated.UploadHtmlToPdf400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
+	}
+
+	// Save file metadata to database for ownership tracking
+	_, err = h.fileUploadService.CreateFileUpload(userID, key, filename, contentType, int64(len(pdfContent)))
+	if err != nil {
+		// Try to clean up S3 file if DB save fails
+		_ = h.uploadService.DeleteFile(ctx, key)
+		return generated.UploadHtmlToPdf400JSONResponse{BadRequestJSONResponse: badRequest("Failed to save file metadata")}, nil
+	}
+
+	// Generate presigned download URL
+	downloadURL, err := h.uploadService.GetPresignedDownloadURL(ctx, key)
+	if err != nil {
+		return generated.UploadHtmlToPdf400JSONResponse{BadRequestJSONResponse: badRequest("Failed to generate download URL")}, nil
+	}
+
+	return generated.UploadHtmlToPdf201JSONResponse{
+		Key:         key,
+		DownloadUrl: downloadURL,
+		Filename:    filename,
+		Size:        len(pdfContent),
+		ContentType: contentType,
 	}, nil
 }
