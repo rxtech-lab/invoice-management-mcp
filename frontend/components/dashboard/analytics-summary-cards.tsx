@@ -5,35 +5,36 @@ import { DollarSign, FileText, AlertCircle, CheckCircle } from "lucide-react";
 
 interface AnalyticsSummaryCardsProps {
   summary: AnalyticsSummary;
+  displayCurrency?: string;
 }
 
-export function AnalyticsSummaryCards({ summary }: AnalyticsSummaryCardsProps) {
+export function AnalyticsSummaryCards({ summary, displayCurrency = "USD" }: AnalyticsSummaryCardsProps) {
   const cards = [
     {
       title: "Total Invoices",
       value: summary.invoice_count.toString(),
-      description: formatCurrency(summary.total_amount),
+      description: formatCurrency(summary.total_amount, displayCurrency),
       icon: FileText,
       className: "",
     },
     {
       title: "Paid",
       value: summary.paid_count.toString(),
-      description: formatCurrency(summary.paid_amount),
+      description: formatCurrency(summary.paid_amount, displayCurrency),
       icon: CheckCircle,
       className: "text-green-600",
     },
     {
       title: "Unpaid",
       value: summary.unpaid_count.toString(),
-      description: formatCurrency(summary.unpaid_amount),
+      description: formatCurrency(summary.unpaid_amount, displayCurrency),
       icon: DollarSign,
       className: "text-yellow-600",
     },
     {
       title: "Overdue",
       value: summary.overdue_count.toString(),
-      description: formatCurrency(summary.overdue_amount),
+      description: formatCurrency(summary.overdue_amount, displayCurrency),
       icon: AlertCircle,
       className: "text-red-600",
     },

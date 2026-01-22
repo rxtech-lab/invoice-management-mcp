@@ -8,13 +8,34 @@ import {
 } from "@/lib/api/analytics";
 import { getInvoices } from "@/lib/api/invoices";
 import { PeriodSelector } from "@/components/dashboard/period-selector";
-import { AnalyticsSummaryCards } from "@/components/dashboard/analytics-summary-cards";
-import { CategoryBreakdownChart } from "@/components/dashboard/category-breakdown-chart";
-import { TagBreakdownChart } from "@/components/dashboard/tag-breakdown-chart";
-import { GroupBreakdownChart } from "@/components/dashboard/group-breakdown-chart";
-import { SpendingTrendChart } from "@/components/dashboard/spending-trend-chart";
+import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import type { AnalyticsPeriod } from "@/lib/api/types";
 import { Skeleton } from "@/components/ui/skeleton";
+
+function DashboardContentFallback() {
+  return (
+    <div className="space-y-6">
+      {/* Currency Picker placeholder */}
+      <div className="flex justify-end">
+        <Skeleton className="h-9 w-[180px]" />
+      </div>
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-[120px]" />
+        ))}
+      </div>
+      {/* Trend Chart */}
+      <Skeleton className="h-[400px]" />
+      {/* Breakdown Charts */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-[400px]" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface DashboardPageProps {
   searchParams: Promise<{ period?: string }>;
@@ -22,20 +43,6 @@ interface DashboardPageProps {
 
 function PeriodSelectorFallback() {
   return <Skeleton className="h-9 w-[150px]" />;
-}
-
-function SummaryCardsFallback() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {[1, 2, 3, 4].map((i) => (
-        <Skeleton key={i} className="h-[120px]" />
-      ))}
-    </div>
-  );
-}
-
-function ChartFallback() {
-  return <Skeleton className="h-[400px]" />;
 }
 
 export default async function DashboardPage({
@@ -70,39 +77,17 @@ export default async function DashboardPage({
         </Suspense>
       </div>
 
-      {/* Summary Cards */}
-      <Suspense fallback={<SummaryCardsFallback />}>
-        <AnalyticsSummaryCards summary={summary} />
+      <Suspense fallback={<DashboardContentFallback />}>
+        <DashboardContent
+          summary={summary}
+          byCategory={byCategory}
+          byCompany={byCompany}
+          byReceiver={byReceiver}
+          byTag={byTag}
+          invoices={invoices}
+          period={period}
+        />
       </Suspense>
-
-      {/* Spending Trend Chart */}
-      <Suspense fallback={<ChartFallback />}>
-        <SpendingTrendChart invoices={invoices} defaultPeriod={period} />
-      </Suspense>
-
-      {/* Breakdown Charts Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Suspense fallback={<ChartFallback />}>
-          <CategoryBreakdownChart data={byCategory} />
-        </Suspense>
-        <Suspense fallback={<ChartFallback />}>
-          <TagBreakdownChart data={byTag} />
-        </Suspense>
-        <Suspense fallback={<ChartFallback />}>
-          <GroupBreakdownChart
-            data={byCompany}
-            title="By Company"
-            description="Invoice amounts grouped by company"
-          />
-        </Suspense>
-        <Suspense fallback={<ChartFallback />}>
-          <GroupBreakdownChart
-            data={byReceiver}
-            title="By Receiver"
-            description="Invoice amounts grouped by receiver"
-          />
-        </Suspense>
-      </div>
     </div>
   );
 }

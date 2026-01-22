@@ -21,6 +21,7 @@ import { formatCurrency } from "@/lib/utils";
 
 interface CategoryBreakdownChartProps {
   data: AnalyticsByGroup;
+  displayCurrency?: string;
 }
 
 const DEFAULT_COLORS = [
@@ -31,7 +32,7 @@ const DEFAULT_COLORS = [
   "hsl(var(--chart-5))",
 ];
 
-export function CategoryBreakdownChart({ data }: CategoryBreakdownChartProps) {
+export function CategoryBreakdownChart({ data, displayCurrency = "USD" }: CategoryBreakdownChartProps) {
   const { chartData, chartConfig } = useMemo(() => {
     const items = data.items.map((item, index) => ({
       name: item.name,
@@ -84,7 +85,7 @@ export function CategoryBreakdownChart({ data }: CategoryBreakdownChartProps) {
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  formatter={(value) => formatCurrency(value as number)}
+                  formatter={(value) => formatCurrency(value as number, displayCurrency)}
                 />
               }
             />

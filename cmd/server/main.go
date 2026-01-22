@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/rxtech-lab/invoice-management/internal/api"
@@ -29,12 +31,16 @@ func main() {
 	// Get the underlying GORM DB for service creation
 	db := dbService.GetDB()
 
+	// Initialize Redis and FX services
+	redisService := initRedisService()
+	fxService := initFXService(redisService)
+
 	// Initialize services
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
 	receiverService := services.NewReceiverService(db)
 	tagService := services.NewTagService(db)
-	invoiceService := services.NewInvoiceService(db)
+	invoiceService := services.NewInvoiceService(db, fxService)
 	uploadService := initUploadService()
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
@@ -187,4 +193,26 @@ func initPDFService() services.PDFService {
 	return services.NewPDFService(services.PDFServiceConfig{
 		ChromeURL: chromeURL,
 	})
+}
+
+func initRedisService() services.RedisService {
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		log.Println("REDIS_URL not configured, FX rate caching disabled")
+		return nil
+	}
+
+	service, err := services.NewRedisService(redisURL)
+	if err != nil {
+		log.Printf("Warning: Failed to connect to Redis: %v", err)
+		return nil
+	}
+
+	log.Println("Redis service initialized")
+	return service
+}
+
+func initFXService(redis services.RedisService) services.FXService {
+	// FX service with 1-minute cache TTL
+	return services.NewFXService(redis, &http.Client{Timeout: 10 * time.Second}, time.Minute)
 }

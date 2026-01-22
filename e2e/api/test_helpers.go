@@ -46,7 +46,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	companyService := services.NewCompanyService(db)
 	receiverService := services.NewReceiverService(db)
 	tagService := services.NewTagService(db)
-	invoiceService := services.NewInvoiceService(db)
+	invoiceService := services.NewInvoiceService(db, nil)
 	uploadService := services.NewMockUploadService()
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
@@ -406,7 +406,7 @@ func NewTestSetupWithFileServer(t *testing.T, fileServerURL string, withOAuth bo
 	companyService := services.NewCompanyService(db)
 	receiverService := services.NewReceiverService(db)
 	tagService := services.NewTagService(db)
-	invoiceService := services.NewInvoiceService(db)
+	invoiceService := services.NewInvoiceService(db, nil)
 	uploadService := services.NewMockUploadService()
 	fileUploadService := services.NewFileUploadService(db)
 	analyticsService := services.NewAnalyticsService(db)
@@ -510,4 +510,114 @@ func SetupTestAuthMiddlewareWithOAuth(app *fiber.App) {
 		}
 		return c.Next()
 	})
+}
+
+// NewTestSetupWithFXService creates a new test setup with a custom FX service
+func NewTestSetupWithFXService(t *testing.T, fxService services.FXService) *TestSetup {
+	// Create in-memory database
+	dbService, err := services.NewSqliteDBService(":memory:")
+	require.NoError(t, err, "Failed to create in-memory database")
+
+	db := dbService.GetDB()
+
+	// Create services - pass fxService to invoice service
+	categoryService := services.NewCategoryService(db)
+	companyService := services.NewCompanyService(db)
+	receiverService := services.NewReceiverService(db)
+	tagService := services.NewTagService(db)
+	invoiceService := services.NewInvoiceService(db, fxService)
+	uploadService := services.NewMockUploadService()
+	fileUploadService := services.NewFileUploadService(db)
+	analyticsService := services.NewAnalyticsService(db)
+
+	// Create file unlink service with empty URL (will skip unlinking)
+	fileUnlinkService := services.NewFileUnlinkService(services.FileUnlinkConfig{
+		FileServerURL: "",
+	})
+
+	// Create API server
+	apiServer := api.NewAPIServer(
+		dbService,
+		categoryService,
+		companyService,
+		receiverService,
+		tagService,
+		invoiceService,
+		uploadService,
+		fileUploadService,
+		analyticsService,
+		fileUnlinkService,
+		nil, // No PDF service for tests
+		nil, // No MCP server for tests
+	)
+
+	// Add test authentication middleware before routes
+	SetupTestAuthMiddleware(apiServer.GetFiberApp())
+
+	// Setup routes
+	apiServer.SetupRoutes()
+
+	setup := &TestSetup{
+		t:                t,
+		DBService:        dbService,
+		CategoryService:  categoryService,
+		CompanyService:   companyService,
+		ReceiverService:  receiverService,
+		InvoiceService:   invoiceService,
+		UploadService:    uploadService,
+		AnalyticsService: analyticsService,
+		APIServer:        apiServer,
+		App:              apiServer.GetFiberApp(),
+		TestUserID:       "test-user-123",
+	}
+
+	return setup
+}
+
+// CreateTestInvoiceWithCurrency creates a test invoice with a specific currency
+func (s *TestSetup) CreateTestInvoiceWithCurrency(title string, currency string) (uint, error) {
+	invoice := map[string]interface{}{
+		"title":       title,
+		"description": "Test invoice",
+		"currency":    currency,
+		"status":      "unpaid",
+	}
+
+	resp, err := s.MakeRequest("POST", "/api/invoices", invoice)
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := s.ReadResponseBody(resp)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint(result["id"].(float64)), nil
+}
+
+// UpdateInvoiceCurrency updates an invoice's currency
+func (s *TestSetup) UpdateInvoiceCurrency(invoiceID uint, currency string) (*http.Response, error) {
+	update := map[string]interface{}{
+		"currency": currency,
+	}
+	return s.MakeRequest("PUT", "/api/invoices/"+uintToStringHelper(invoiceID), update)
+}
+
+// UpdateInvoiceItemWithTargetAmount updates an invoice item with optional target_amount override
+// If targetAmount is nil, the target_amount will be auto-calculated using the FX rate
+// If targetAmount is provided, it will be used as a manual override
+func (s *TestSetup) UpdateInvoiceItemWithTargetAmount(invoiceID, itemID uint, description string, quantity, unitPrice float64, targetAmount *float64) (*http.Response, error) {
+	update := map[string]interface{}{
+		"description": description,
+		"quantity":    quantity,
+		"unit_price":  unitPrice,
+	}
+	if targetAmount != nil {
+		update["target_amount"] = *targetAmount
+	} else {
+		// When no manual override is provided, auto-calculate target_amount
+		update["auto_calculate_target_currency"] = true
+	}
+	return s.MakeRequest("PUT", fmt.Sprintf("/api/invoices/%d/items/%d", invoiceID, itemID), update)
 }

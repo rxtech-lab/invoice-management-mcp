@@ -67,3 +67,25 @@ export async function deleteInvoiceItemAction(
     };
   }
 }
+
+export async function recalculateInvoiceItemTargetAmountAction(
+  invoiceId: number,
+  itemId: number
+): Promise<{ success: boolean; data?: InvoiceItem; error?: string }> {
+  try {
+    const item = await apiClient<InvoiceItem>(
+      `/api/invoices/${invoiceId}/items/${itemId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ auto_calculate_target_currency: true }),
+      }
+    );
+    revalidatePath(`/invoices/${invoiceId}`);
+    return { success: true, data: item };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to recalculate",
+    };
+  }
+}

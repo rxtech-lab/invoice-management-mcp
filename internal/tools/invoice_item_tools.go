@@ -82,6 +82,7 @@ func (t *UpdateInvoiceItemTool) GetTool() mcp.Tool {
 		mcp.WithString("description", mcp.Description("Item description")),
 		mcp.WithNumber("quantity", mcp.Description("Quantity")),
 		mcp.WithNumber("unit_price", mcp.Description("Unit price")),
+		mcp.WithNumber("target_amount", mcp.Description("Manual override for USD amount (optional, auto-calculated if not provided)")),
 	)
 }
 
@@ -102,13 +103,19 @@ func (t *UpdateInvoiceItemTool) GetHandler() server.ToolHandlerFunc {
 		quantity := getFloatArg(args, "quantity", 0)
 		unitPrice := getFloatArg(args, "unit_price", 0)
 
+		// Handle optional target_amount override
+		var targetAmountOverride *float64
+		if targetAmount, ok := args["target_amount"].(float64); ok {
+			targetAmountOverride = &targetAmount
+		}
+
 		item := &models.InvoiceItem{
 			Description: description,
 			Quantity:    quantity,
 			UnitPrice:   unitPrice,
 		}
 
-		if err := t.service.UpdateInvoiceItem(userID, itemID, item); err != nil {
+		if err := t.service.UpdateInvoiceItem(userID, itemID, item, targetAmountOverride, false); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to update item: %v", err)), nil
 		}
 

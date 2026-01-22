@@ -1606,6 +1606,18 @@ components:
           type: number
           format: double
           description: Total amount (quantity * unit_price)
+        target_currency:
+          type: string
+          description: Target currency for normalization (USD)
+          default: USD
+        target_amount:
+          type: number
+          format: double
+          description: Amount converted to target currency (USD)
+        fx_rate_used:
+          type: number
+          format: double
+          description: Exchange rate used for conversion
         created_at:
           type: string
           format: date-time
@@ -1818,6 +1830,14 @@ components:
         unit_price:
           type: number
           format: double
+        target_amount:
+          type: number
+          format: double
+          description: Manual override for USD amount (optional, auto-calculated if not provided)
+        auto_calculate_target_currency:
+          type: boolean
+          default: false
+          description: When true, forces recalculation of target_amount using latest FX rate
 
     InvoiceListResponse:
       type: object

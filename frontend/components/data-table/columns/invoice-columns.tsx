@@ -171,6 +171,23 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
       formatCurrency(row.original.amount, row.original.currency),
   },
   {
+    accessorKey: "target_amount",
+    header: "USD Amount",
+    cell: ({ row }) => {
+      const { currency, target_amount, amount } = row.original;
+      // If already in USD, just show the amount
+      if (currency === "USD") {
+        return <span className="text-muted-foreground">-</span>;
+      }
+      // Show converted USD amount
+      return (
+        <span className="text-muted-foreground">
+          {formatCurrency(target_amount || amount, "USD")}
+        </span>
+      );
+    },
+  },
+  {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {

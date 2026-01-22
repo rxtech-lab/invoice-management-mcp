@@ -18,12 +18,14 @@ import {
   updateInvoiceItemAction,
   deleteInvoiceItemAction,
 } from "@/lib/actions/invoice-item-actions";
+import { FXRecalculateDialog } from "@/components/forms/fx-recalculate-dialog";
 import { toast } from "sonner";
 import { Loader2, Plus, Pencil, Trash, Check, X } from "lucide-react";
 import { CurrencyPicker } from "@/components/currency/currency-picker";
 import { ConvertedAmount } from "@/components/currency/converted-amount";
 import { useExchangeRate } from "@/hooks/use-exchange-rate";
 import type { CurrencyCode } from "@/lib/currency";
+import { formatCurrency } from "@/lib/utils";
 
 interface InvoiceItemsTableProps {
   invoiceId: number;
@@ -36,6 +38,8 @@ interface EditingItem {
   description: string;
   quantity: number;
   unit_price: number;
+  target_amount: number | null; // null = auto-calculate, number = manual override
+  target_amount_modified: boolean; // track if user explicitly changed target_amount
 }
 
 export function InvoiceItemsTable({
@@ -51,16 +55,24 @@ export function InvoiceItemsTable({
     description: "",
     quantity: 1,
     unit_price: 0,
+    target_amount: null,
+    target_amount_modified: false,
   });
   const [editItem, setEditItem] = useState<EditingItem>({
     id: null,
     description: "",
     quantity: 1,
     unit_price: 0,
+    target_amount: null,
+    target_amount_modified: false,
   });
   const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode | null>(
     null
   );
+
+  // FX recalculation dialog state
+  const [showFXDialog, setShowFXDialog] = useState(false);
+  const [originalUnitPrice, setOriginalUnitPrice] = useState<number | null>(null);
 
   const { rate, isLoading: rateLoading, convert } = useExchangeRate({
     fromCurrency: currency,
@@ -84,7 +96,7 @@ export function InvoiceItemsTable({
 
     if (result.success) {
       toast.success("Item added");
-      setNewItem({ id: null, description: "", quantity: 1, unit_price: 0 });
+      setNewItem({ id: null, description: "", quantity: 1, unit_price: 0, target_amount: null, target_amount_modified: false });
       setIsAdding(false);
     } else {
       toast.error(result.error || "Failed to add item");
@@ -94,39 +106,69 @@ export function InvoiceItemsTable({
 
   const handleStartEdit = (item: InvoiceItem) => {
     setEditingId(item.id);
+    setOriginalUnitPrice(item.unit_price); // Track original price for FX dialog
     setEditItem({
       id: item.id,
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unit_price,
+      target_amount: item.target_amount, // Initialize with current value
+      target_amount_modified: false, // Track if user explicitly changes this
     });
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (autoRecalculate: boolean = false) => {
     if (!editItem.id || !editItem.description.trim()) {
       toast.error("Description is required");
       return;
     }
 
-    setLoading(editItem.id);
-    const result = await updateInvoiceItemAction(invoiceId, editItem.id, {
+    const itemId = editItem.id;
+
+    setLoading(itemId);
+    const result = await updateInvoiceItemAction(invoiceId, itemId, {
       description: editItem.description,
       quantity: editItem.quantity,
       unit_price: editItem.unit_price,
+      // Only pass target_amount if user explicitly modified it (for manual USD override)
+      target_amount: editItem.target_amount_modified ? (editItem.target_amount ?? undefined) : undefined,
+      // Include auto_calculate flag if user confirmed recalculation
+      auto_calculate_target_currency: autoRecalculate || undefined,
     });
 
     if (result.success) {
-      toast.success("Item updated");
+      toast.success(autoRecalculate ? "Item updated with recalculated USD amount" : "Item updated");
       setEditingId(null);
+      setOriginalUnitPrice(null);
     } else {
       toast.error(result.error || "Failed to update item");
     }
     setLoading(null);
   };
 
+  // Check if we should show FX dialog before saving
+  const handleTrySaveEdit = () => {
+    if (!editItem.id || !editItem.description.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+
+    const priceChanged = originalUnitPrice !== editItem.unit_price;
+    const isNonUSD = currency !== "USD";
+    const targetNotManuallyModified = !editItem.target_amount_modified;
+
+    // Show FX dialog if price changed on a non-USD invoice and target wasn't manually modified
+    if (priceChanged && isNonUSD && targetNotManuallyModified) {
+      setShowFXDialog(true);
+    } else {
+      // No dialog needed, save directly
+      handleSaveEdit(false);
+    }
+  };
+
   const handleCancelEdit = () => {
     setEditingId(null);
-    setEditItem({ id: null, description: "", quantity: 1, unit_price: 0 });
+    setEditItem({ id: null, description: "", quantity: 1, unit_price: 0, target_amount: null, target_amount_modified: false });
   };
 
   const handleDelete = async (itemId: number) => {
@@ -141,6 +183,16 @@ export function InvoiceItemsTable({
       toast.error(result.error || "Failed to delete item");
     }
     setLoading(null);
+  };
+
+  const handleFXRecalculateConfirm = () => {
+    setShowFXDialog(false);
+    handleSaveEdit(true); // Save with auto_calculate_target_currency=true
+  };
+
+  const handleFXRecalculateCancel = () => {
+    setShowFXDialog(false);
+    handleSaveEdit(false); // Save without recalculating
   };
 
   return (
@@ -168,10 +220,13 @@ export function InvoiceItemsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40%]">Description</TableHead>
-              <TableHead className="w-[15%]">Quantity</TableHead>
-              <TableHead className="w-[20%]">Unit Price</TableHead>
+              <TableHead className="w-[35%]">Description</TableHead>
+              <TableHead className="w-[10%]">Quantity</TableHead>
+              <TableHead className="w-[15%]">Unit Price</TableHead>
               <TableHead className="w-[15%]">Amount</TableHead>
+              {currency !== "USD" && (
+                <TableHead className="w-[15%]">USD Amount</TableHead>
+              )}
               <TableHead className="w-[10%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -229,12 +284,31 @@ export function InvoiceItemsTable({
                         displayCurrency={displayCurrency}
                       />
                     </TableCell>
+                    {currency !== "USD" && (
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editItem.target_amount ?? ""}
+                          onChange={(e) =>
+                            setEditItem({
+                              ...editItem,
+                              target_amount: e.target.value ? parseFloat(e.target.value) : null,
+                              target_amount_modified: true, // Mark as modified when user changes value
+                            })
+                          }
+                          placeholder="Auto"
+                          className="w-24"
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={handleSaveEdit}
+                          onClick={handleTrySaveEdit}
                           disabled={loading === item.id}
                         >
                           {loading === item.id ? (
@@ -274,6 +348,11 @@ export function InvoiceItemsTable({
                         displayCurrency={displayCurrency}
                       />
                     </TableCell>
+                    {currency !== "USD" && (
+                      <TableCell className="text-muted-foreground">
+                        {formatCurrency(item.target_amount || item.amount, "USD")}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
@@ -354,6 +433,11 @@ export function InvoiceItemsTable({
                     displayCurrency={displayCurrency}
                   />
                 </TableCell>
+                {currency !== "USD" && (
+                  <TableCell className="text-muted-foreground text-sm">
+                    (calculated on save)
+                  </TableCell>
+                )}
                 <TableCell>
                   <div className="flex gap-1">
                     <Button
@@ -378,6 +462,8 @@ export function InvoiceItemsTable({
                           description: "",
                           quantity: 1,
                           unit_price: 0,
+                          target_amount: null,
+                          target_amount_modified: false,
                         });
                       }}
                     >
@@ -389,15 +475,15 @@ export function InvoiceItemsTable({
             )}
             {items.length === 0 && !isAdding && (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  No items yet. Click "Add Item" to add one.
+                <TableCell colSpan={currency !== "USD" ? 6 : 5} className="h-24 text-center">
+                  No items yet. Click &quot;Add Item&quot; to add one.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
         {items.length > 0 && (
-          <div className="mt-4 flex justify-end border-t pt-4">
+          <div className="mt-4 flex justify-end gap-6 border-t pt-4">
             <div className="text-lg font-semibold">
               Total:{" "}
               <ConvertedAmount
@@ -407,9 +493,26 @@ export function InvoiceItemsTable({
                 displayCurrency={displayCurrency}
               />
             </div>
+            {currency !== "USD" && (
+              <div className="text-lg font-semibold text-muted-foreground">
+                USD Total: {formatCurrency(
+                  items.reduce((sum, item) => sum + (item.target_amount || item.amount), 0),
+                  "USD"
+                )}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
+
+      {/* FX Recalculation Dialog */}
+      <FXRecalculateDialog
+        open={showFXDialog}
+        onOpenChange={setShowFXDialog}
+        onConfirm={handleFXRecalculateConfirm}
+        onCancel={handleFXRecalculateCancel}
+        currency={currency}
+      />
     </Card>
   );
 }
