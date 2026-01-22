@@ -26,14 +26,16 @@ export async function POST(request: Request) {
     });
   }
 
-  // Parse request body
-  let fileUrl: string;
+  // Parse request body - accept file_url OR file_key
+  let fileUrl: string | undefined;
+  let fileKey: string | undefined;
   try {
     const body = await request.json();
     fileUrl = body.file_url;
-    if (!fileUrl) {
+    fileKey = body.file_key;
+    if (!fileUrl && !fileKey) {
       return new Response(
-        JSON.stringify({ error: "Missing file_url in request body" }),
+        JSON.stringify({ error: "Missing file_url or file_key in request body" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -55,25 +57,37 @@ export async function POST(request: Request) {
       };
 
       try {
-        // Step 1: Upload file from external URL to S3
-        sendEvent("progress", {
-          status: "calling",
-          message: "Uploading file to storage...",
-        });
+        // Step 1: Upload file from external URL to S3 (skip if file_key provided)
+        if (!fileKey && fileUrl) {
+          sendEvent("progress", {
+            status: "calling",
+            message: "Uploading file to storage...",
+          });
 
-        const uploadResult = await uploadFromURL(fileUrl, token);
-        if (!uploadResult.success || !uploadResult.data) {
+          const uploadResult = await uploadFromURL(fileUrl, token);
+          if (!uploadResult.success || !uploadResult.data) {
+            sendEvent("error", {
+              status: "error",
+              message: uploadResult.error || "Failed to upload file",
+            });
+            controller.close();
+            return;
+          }
+
+          fileKey = uploadResult.data.key;
+        }
+
+        // Ensure fileKey is defined (should always be true at this point)
+        if (!fileKey) {
           sendEvent("error", {
             status: "error",
-            message: uploadResult.error || "Failed to upload file",
+            message: "No file key available",
           });
           controller.close();
           return;
         }
 
-        const fileKey = uploadResult.data.key;
-
-        // Step 2: Get presigned download URL for the uploaded file
+        // Step 2: Get presigned download URL for the file
         sendEvent("progress", {
           status: "calling",
           message: "Preparing file for processing...",
