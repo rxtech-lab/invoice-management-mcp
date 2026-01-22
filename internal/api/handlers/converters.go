@@ -185,14 +185,17 @@ func invoiceListToGenerated(invoices []models.Invoice) []generated.Invoice {
 
 func invoiceItemModelToGenerated(item *models.InvoiceItem) generated.InvoiceItem {
 	return generated.InvoiceItem{
-		Id:          ptr(int(item.ID)),
-		InvoiceId:   ptr(int(item.InvoiceID)),
-		Description: ptr(item.Description),
-		Quantity:    ptr(item.Quantity),
-		UnitPrice:   ptr(item.UnitPrice),
-		Amount:      ptr(item.Amount),
-		CreatedAt:   ptr(item.CreatedAt),
-		UpdatedAt:   ptr(item.UpdatedAt),
+		Id:             ptr(int(item.ID)),
+		InvoiceId:      ptr(int(item.InvoiceID)),
+		Description:    ptr(item.Description),
+		Quantity:       ptr(item.Quantity),
+		UnitPrice:      ptr(item.UnitPrice),
+		Amount:         ptr(item.Amount),
+		TargetCurrency: ptr(item.TargetCurrency),
+		TargetAmount:   ptr(item.TargetAmount),
+		FxRateUsed:     ptr(item.FXRateUsed),
+		CreatedAt:      ptr(item.CreatedAt),
+		UpdatedAt:      ptr(item.UpdatedAt),
 	}
 }
 

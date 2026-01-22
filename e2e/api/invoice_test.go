@@ -574,6 +574,132 @@ func (s *InvoiceTestSuite) TestCreateInvoice_NullReceiverMatchNull() {
 	s.Equal(firstInvoiceID, result2["id"], "Invoices with null receiver should be detected as duplicates")
 }
 
+func (s *InvoiceTestSuite) TestUpdateInvoiceItem_PreservesTargetAmountWhenNotRecalculating() {
+	// Create a non-USD invoice
+	categoryID, _ := s.setup.CreateTestCategory("Test")
+	companyID, _ := s.setup.CreateTestCompany("Test")
+
+	invoice := map[string]interface{}{
+		"title":    "EUR Invoice",
+		"currency": "EUR",
+	}
+	if categoryID != 0 {
+		invoice["category_id"] = categoryID
+	}
+	if companyID != 0 {
+		invoice["company_id"] = companyID
+	}
+
+	resp, err := s.setup.MakeRequest("POST", "/api/invoices", invoice)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp.StatusCode)
+
+	result, err := s.setup.ReadResponseBody(resp)
+	s.Require().NoError(err)
+	invoiceID := uint(result["id"].(float64))
+
+	// Add an item - this will auto-calculate target_amount
+	item := map[string]interface{}{
+		"description": "Test Item",
+		"quantity":    1,
+		"unit_price":  100.00,
+	}
+
+	resp, err = s.setup.MakeRequest("POST", "/api/invoices/"+uintToString(invoiceID)+"/items", item)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp.StatusCode)
+
+	result, err = s.setup.ReadResponseBody(resp)
+	s.Require().NoError(err)
+	itemID := uint(result["id"].(float64))
+	initialTargetAmount := result["target_amount"].(float64)
+
+	// Update the item's unit_price WITHOUT auto_calculate_target_currency
+	// The target_amount should be PRESERVED
+	update := map[string]interface{}{
+		"unit_price": 200.00,
+	}
+
+	resp, err = s.setup.MakeRequest("PUT", "/api/invoices/"+uintToString(invoiceID)+"/items/"+uintToString(itemID), update)
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, resp.StatusCode)
+
+	result, err = s.setup.ReadResponseBody(resp)
+	s.Require().NoError(err)
+
+	// Verify target_amount is preserved (same as initial)
+	s.Equal(float64(200), result["unit_price"])
+	s.Equal(initialTargetAmount, result["target_amount"].(float64), "target_amount should be preserved when auto_calculate_target_currency is not set")
+}
+
+func (s *InvoiceTestSuite) TestUpdateInvoiceItem_RecalculatesTargetAmountWhenFlagSet() {
+	// Create a non-USD invoice
+	categoryID, _ := s.setup.CreateTestCategory("Test")
+	companyID, _ := s.setup.CreateTestCompany("Test")
+
+	invoice := map[string]interface{}{
+		"title":    "EUR Invoice 2",
+		"currency": "EUR",
+	}
+	if categoryID != 0 {
+		invoice["category_id"] = categoryID
+	}
+	if companyID != 0 {
+		invoice["company_id"] = companyID
+	}
+
+	resp, err := s.setup.MakeRequest("POST", "/api/invoices", invoice)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp.StatusCode)
+
+	result, err := s.setup.ReadResponseBody(resp)
+	s.Require().NoError(err)
+	invoiceID := uint(result["id"].(float64))
+
+	// Add an item
+	item := map[string]interface{}{
+		"description": "Test Item",
+		"quantity":    1,
+		"unit_price":  100.00,
+	}
+
+	resp, err = s.setup.MakeRequest("POST", "/api/invoices/"+uintToString(invoiceID)+"/items", item)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp.StatusCode)
+
+	result, err = s.setup.ReadResponseBody(resp)
+	s.Require().NoError(err)
+	itemID := uint(result["id"].(float64))
+	initialTargetAmount := result["target_amount"].(float64)
+
+	// Update the item's unit_price WITH auto_calculate_target_currency=true
+	// The target_amount SHOULD be recalculated based on new amount
+	update := map[string]interface{}{
+		"unit_price":                     200.00,
+		"auto_calculate_target_currency": true,
+	}
+
+	resp, err = s.setup.MakeRequest("PUT", "/api/invoices/"+uintToString(invoiceID)+"/items/"+uintToString(itemID), update)
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, resp.StatusCode)
+
+	result, err = s.setup.ReadResponseBody(resp)
+	s.Require().NoError(err)
+
+	// Verify unit_price is updated
+	s.Equal(float64(200), result["unit_price"])
+
+	// Verify target_amount is recalculated (should be different from initial)
+	// Since the amount doubled (100 -> 200), the target_amount should also roughly double
+	newTargetAmount := result["target_amount"].(float64)
+	s.NotEqual(initialTargetAmount, newTargetAmount, "target_amount should be recalculated when auto_calculate_target_currency is true")
+
+	// The new target amount should be approximately 2x the initial (same FX rate, double amount)
+	expectedRatio := 2.0
+	actualRatio := newTargetAmount / initialTargetAmount
+	s.InDelta(expectedRatio, actualRatio, 0.01, "target_amount should scale proportionally with amount")
+}
+
 func TestInvoiceSuite(t *testing.T) {
 	suite.Run(t, new(InvoiceTestSuite))
 }

@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Invoice, AnalyticsPeriod } from "@/lib/api/types";
+import type { CurrencyCode } from "@/lib/currency";
 import {
   format,
   parseISO,
@@ -43,6 +44,8 @@ import {
 interface SpendingTrendChartProps {
   invoices: Invoice[];
   defaultPeriod?: AnalyticsPeriod;
+  displayCurrency?: CurrencyCode | null;
+  exchangeRate?: number | null;
 }
 
 const periods: { value: AnalyticsPeriod; label: string }[] = [
@@ -51,14 +54,30 @@ const periods: { value: AnalyticsPeriod; label: string }[] = [
   { value: "1y", label: "12 Months" },
 ];
 
-export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingTrendChartProps) {
+export function SpendingTrendChart({
+  invoices,
+  defaultPeriod = "1m",
+  displayCurrency,
+  exchangeRate,
+}: SpendingTrendChartProps) {
   const [period, setPeriod] = useState<AnalyticsPeriod>(defaultPeriod);
+
+  // Helper to convert amount using exchange rate
+  const convertAmount = (amount: number) => {
+    if (displayCurrency && exchangeRate) {
+      return amount * exchangeRate;
+    }
+    return amount;
+  };
 
   const chartData = useMemo(() => {
     const now = new Date();
 
     // Helper to get invoice date (due_date with created_at fallback)
     const getInvoiceDate = (inv: Invoice) => parseISO(inv.due_date || inv.created_at);
+
+    // Use target_amount (USD normalized) for calculations
+    const getAmount = (inv: Invoice) => inv.target_amount || inv.amount;
 
     if (period === "7d") {
       // Last 7 days - daily breakdown
@@ -71,10 +90,10 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
           return isSameDay(invDate, day);
         });
 
-        const total = dayInvoices.reduce((sum, inv) => sum + inv.amount, 0);
-        const paid = dayInvoices
+        const total = convertAmount(dayInvoices.reduce((sum, inv) => sum + getAmount(inv), 0));
+        const paid = convertAmount(dayInvoices
           .filter((inv) => inv.status === "paid")
-          .reduce((sum, inv) => sum + inv.amount, 0);
+          .reduce((sum, inv) => sum + getAmount(inv), 0));
 
         return {
           date: format(day, "MMM d"),
@@ -93,10 +112,10 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
           return isSameDay(invDate, day);
         });
 
-        const total = dayInvoices.reduce((sum, inv) => sum + inv.amount, 0);
-        const paid = dayInvoices
+        const total = convertAmount(dayInvoices.reduce((sum, inv) => sum + getAmount(inv), 0));
+        const paid = convertAmount(dayInvoices
           .filter((inv) => inv.status === "paid")
-          .reduce((sum, inv) => sum + inv.amount, 0);
+          .reduce((sum, inv) => sum + getAmount(inv), 0));
 
         return {
           date: format(day, "MMM d"),
@@ -115,10 +134,10 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
           return isSameMonth(invDate, month);
         });
 
-        const total = monthInvoices.reduce((sum, inv) => sum + inv.amount, 0);
-        const paid = monthInvoices
+        const total = convertAmount(monthInvoices.reduce((sum, inv) => sum + getAmount(inv), 0));
+        const paid = convertAmount(monthInvoices
           .filter((inv) => inv.status === "paid")
-          .reduce((sum, inv) => sum + inv.amount, 0);
+          .reduce((sum, inv) => sum + getAmount(inv), 0));
 
         return {
           date: format(month, "MMM yyyy"),
@@ -127,7 +146,7 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
         };
       });
     }
-  }, [invoices, period]);
+  }, [invoices, period, displayCurrency, exchangeRate]);
 
   const chartConfig = {
     total: {
@@ -204,7 +223,10 @@ export function SpendingTrendChart({ invoices, defaultPeriod = "1m" }: SpendingT
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => `$${value}`}
+              tickFormatter={(value) => {
+                const symbol = displayCurrency === "EUR" ? "€" : displayCurrency === "GBP" ? "£" : displayCurrency === "JPY" ? "¥" : "$";
+                return `${symbol}${value}`;
+              }}
             />
             <ChartTooltip
               cursor={false}

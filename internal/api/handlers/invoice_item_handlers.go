@@ -61,7 +61,16 @@ func (h *StrictHandlers) UpdateInvoiceItem(
 		existing.UnitPrice = *request.Body.UnitPrice
 	}
 
-	if err := h.invoiceService.UpdateInvoiceItem(userID, uint(request.ItemId), existing); err != nil {
+	// Determine if we should force recalculation
+	forceRecalculate := request.Body.AutoCalculateTargetCurrency != nil && *request.Body.AutoCalculateTargetCurrency
+
+	// Handle manual target_amount override (only if not forcing recalculation)
+	var targetAmountOverride *float64
+	if !forceRecalculate && request.Body.TargetAmount != nil {
+		targetAmountOverride = request.Body.TargetAmount
+	}
+
+	if err := h.invoiceService.UpdateInvoiceItem(userID, uint(request.ItemId), existing, targetAmountOverride, forceRecalculate); err != nil {
 		return generated.UpdateInvoiceItem400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
 	}
 

@@ -21,6 +21,7 @@ import { formatCurrency } from "@/lib/utils";
 
 interface TagBreakdownChartProps {
   data: AnalyticsByGroup;
+  displayCurrency?: string;
 }
 
 const DEFAULT_COLORS = [
@@ -31,7 +32,7 @@ const DEFAULT_COLORS = [
   "hsl(var(--chart-5))",
 ];
 
-export function TagBreakdownChart({ data }: TagBreakdownChartProps) {
+export function TagBreakdownChart({ data, displayCurrency = "USD" }: TagBreakdownChartProps) {
   const { chartData, chartConfig } = useMemo(() => {
     const items = data.items.map((item, index) => ({
       name: item.name,
@@ -84,7 +85,7 @@ export function TagBreakdownChart({ data }: TagBreakdownChartProps) {
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  formatter={(value) => formatCurrency(value as number)}
+                  formatter={(value) => formatCurrency(value as number, displayCurrency)}
                 />
               }
             />

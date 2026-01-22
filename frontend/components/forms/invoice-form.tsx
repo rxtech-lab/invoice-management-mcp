@@ -44,7 +44,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 
-// Note: amount is not in the schema - it's calculated from invoice items
+// Note: amount and target_amount are not in the schema - they're calculated from invoice items
 const invoiceSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
@@ -114,7 +114,7 @@ export function InvoiceForm({
   const onSubmit = async (data: InvoiceFormData) => {
     setIsSubmitting(true);
     try {
-      // Note: amount is not included - it's calculated from invoice items
+      // Note: amount and target_amount are not included - they're calculated from invoice items
       const payload = {
         title: data.title,
         description: data.description || undefined,
@@ -200,7 +200,7 @@ export function InvoiceForm({
               className="max-w-xs"
             />
             <p className="text-sm text-muted-foreground">
-              Amount is calculated from invoice items
+              Amount and USD equivalent are calculated from invoice items
             </p>
           </div>
 

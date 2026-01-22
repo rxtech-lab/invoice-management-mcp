@@ -126,6 +126,10 @@ export interface InvoiceItem {
   quantity: number;
   unit_price: number;
   amount: number;
+  // Currency conversion fields (for USD normalization)
+  target_currency: string;
+  target_amount: number;
+  fx_rate_used: number;
   created_at: string;
   updated_at: string;
 }
@@ -140,6 +144,10 @@ export interface UpdateInvoiceItemRequest {
   description?: string;
   quantity?: number;
   unit_price?: number;
+  // Manual override for USD amount (optional, auto-calculated if not provided)
+  target_amount?: number;
+  // When true, forces recalculation of target_amount using latest FX rate
+  auto_calculate_target_currency?: boolean;
 }
 
 // Invoice
@@ -152,6 +160,8 @@ export interface Invoice {
   invoice_ended_at: string | null;
   amount: number;
   currency: string;
+  // USD-normalized total (computed as sum of item target_amounts)
+  target_amount: number;
   category_id: number | null;
   category?: Category;
   company_id: number | null;
@@ -185,6 +195,7 @@ export interface CreateInvoiceRequest {
 }
 
 // Note: amount is not included - it's calculated from invoice items
+// target_amount is computed from item target_amounts (not editable)
 export interface UpdateInvoiceRequest {
   title?: string;
   description?: string;

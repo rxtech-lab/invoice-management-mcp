@@ -69,6 +69,9 @@ type Invoice struct {
 	Amount   float64 `gorm:"not null;default:0" json:"amount"`
 	Currency string  `gorm:"not null;type:varchar(3);default:'USD'" json:"currency"`
 
+	// USD-normalized total (computed as sum of item target_amounts)
+	TargetAmount float64 `gorm:"default:0" json:"target_amount"`
+
 	// Relationships
 	CategoryID *uint            `gorm:"index" json:"category_id"`
 	Category   *InvoiceCategory `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
@@ -104,11 +107,14 @@ func (Invoice) TableName() string {
 	return "invoices"
 }
 
-// CalculateTotalFromItems calculates and updates the invoice amount from its items
+// CalculateTotalFromItems calculates and updates the invoice amount and target_amount from its items
 func (i *Invoice) CalculateTotalFromItems() {
 	var total float64
+	var targetTotal float64
 	for _, item := range i.Items {
 		total += item.Amount
+		targetTotal += item.TargetAmount
 	}
 	i.Amount = total
+	i.TargetAmount = targetTotal
 }

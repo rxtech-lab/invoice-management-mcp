@@ -28,12 +28,14 @@ interface GroupBreakdownChartProps {
   data: AnalyticsByGroup;
   title: string;
   description: string;
+  displayCurrency?: string;
 }
 
 export function GroupBreakdownChart({
   data,
   title,
   description,
+  displayCurrency = "USD",
 }: GroupBreakdownChartProps) {
   const chartData = useMemo(() => {
     const items = data.items.map((item) => ({
@@ -94,7 +96,10 @@ export function GroupBreakdownChart({
               type="number"
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `$${value}`}
+              tickFormatter={(value) => {
+                const symbol = displayCurrency === "EUR" ? "€" : displayCurrency === "GBP" ? "£" : displayCurrency === "JPY" ? "¥" : "$";
+                return `${symbol}${value}`;
+              }}
             />
             <YAxis
               type="category"

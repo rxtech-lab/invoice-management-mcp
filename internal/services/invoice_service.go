@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -44,7 +45,7 @@ type InvoiceService interface {
 
 	// Invoice Items
 	AddInvoiceItem(userID string, invoiceID uint, item *models.InvoiceItem) error
-	UpdateInvoiceItem(userID string, itemID uint, item *models.InvoiceItem) error
+	UpdateInvoiceItem(userID string, itemID uint, item *models.InvoiceItem, targetAmountOverride *float64, forceRecalculate bool) error
 	DeleteInvoiceItem(userID string, itemID uint) error
 	GetInvoiceItem(userID string, itemID uint) (*models.InvoiceItem, error)
 
@@ -58,12 +59,14 @@ type InvoiceService interface {
 }
 
 type invoiceService struct {
-	db *gorm.DB
+	db        *gorm.DB
+	fxService FXService
 }
 
 // NewInvoiceService creates a new InvoiceService instance
-func NewInvoiceService(db *gorm.DB) InvoiceService {
-	return &invoiceService{db: db}
+// fxService can be nil (currency conversion will default to 1:1)
+func NewInvoiceService(db *gorm.DB, fxService FXService) InvoiceService {
+	return &invoiceService{db: db, fxService: fxService}
 }
 
 // CreateInvoice creates a new invoice with optional items
@@ -72,13 +75,17 @@ func NewInvoiceService(db *gorm.DB) InvoiceService {
 func (s *invoiceService) CreateInvoice(userID string, invoice *models.Invoice) (*CreateInvoiceResult, error) {
 	invoice.UserID = userID
 
-	// Calculate item amounts and total - amount is always calculated from items
+	// Calculate item amounts, target amounts, and totals
 	var totalAmount float64
+	var totalTargetAmount float64
 	for i := range invoice.Items {
 		invoice.Items[i].CalculateAmount()
+		s.calculateItemTargetAmount(&invoice.Items[i], invoice.Currency)
 		totalAmount += invoice.Items[i].Amount
+		totalTargetAmount += invoice.Items[i].TargetAmount
 	}
 	invoice.Amount = totalAmount
+	invoice.TargetAmount = totalTargetAmount
 
 	// Check for duplicate invoice
 	var existing models.Invoice
@@ -224,12 +231,15 @@ func (s *invoiceService) ListInvoices(userID string, opts InvoiceListOptions) ([
 
 // UpdateInvoice updates an existing invoice
 // Note: Amount is NOT updated here - it's calculated from items
+// If currency changes, all item target_amounts are recalculated
 func (s *invoiceService) UpdateInvoice(userID string, invoice *models.Invoice) error {
 	// Verify ownership
 	existing, err := s.GetInvoiceByID(userID, invoice.ID)
 	if err != nil {
 		return fmt.Errorf("invoice not found: %w", err)
 	}
+
+	currencyChanged := existing.Currency != invoice.Currency
 
 	// Update fields (amount is NOT updated - it's calculated from items)
 	// Tags are updated separately via SetInvoiceTags
@@ -244,6 +254,18 @@ func (s *invoiceService) UpdateInvoice(userID string, invoice *models.Invoice) e
 	existing.OriginalDownloadLink = invoice.OriginalDownloadLink
 	existing.Status = invoice.Status
 	existing.DueDate = invoice.DueDate
+
+	// If currency changed, recalculate all item target_amounts
+	if currencyChanged {
+		return s.db.Transaction(func(tx *gorm.DB) error {
+			// Save invoice first
+			if err := tx.Save(existing).Error; err != nil {
+				return err
+			}
+			// Recalculate all item FX and update invoice total
+			return s.recalculateAllItemFX(tx, existing.ID, existing.Currency)
+		})
+	}
 
 	return s.db.Save(existing).Error
 }
@@ -287,14 +309,15 @@ func (s *invoiceService) SearchInvoices(userID string, query string) ([]models.I
 
 // AddInvoiceItem adds an item to an invoice
 func (s *invoiceService) AddInvoiceItem(userID string, invoiceID uint, item *models.InvoiceItem) error {
-	// Verify invoice ownership
-	_, err := s.GetInvoiceByID(userID, invoiceID)
+	// Verify invoice ownership and get currency
+	invoice, err := s.GetInvoiceByID(userID, invoiceID)
 	if err != nil {
 		return fmt.Errorf("invoice not found: %w", err)
 	}
 
 	item.InvoiceID = invoiceID
 	item.CalculateAmount()
+	s.calculateItemTargetAmount(item, invoice.Currency)
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// Create item
@@ -308,10 +331,18 @@ func (s *invoiceService) AddInvoiceItem(userID string, invoiceID uint, item *mod
 }
 
 // UpdateInvoiceItem updates an invoice item
-func (s *invoiceService) UpdateInvoiceItem(userID string, itemID uint, item *models.InvoiceItem) error {
+// targetAmountOverride allows manual override of the USD amount (nil = preserve existing)
+// forceRecalculate forces recalculation of target_amount using latest FX rate
+func (s *invoiceService) UpdateInvoiceItem(userID string, itemID uint, item *models.InvoiceItem, targetAmountOverride *float64, forceRecalculate bool) error {
 	// Get existing item and verify ownership
 	existing, err := s.GetInvoiceItem(userID, itemID)
 	if err != nil {
+		return err
+	}
+
+	// Get invoice to access currency
+	var invoice models.Invoice
+	if err := s.db.First(&invoice, existing.InvoiceID).Error; err != nil {
 		return err
 	}
 
@@ -320,6 +351,23 @@ func (s *invoiceService) UpdateInvoiceItem(userID string, itemID uint, item *mod
 	existing.Quantity = item.Quantity
 	existing.UnitPrice = item.UnitPrice
 	existing.CalculateAmount()
+
+	// Handle target_amount: forceRecalculate takes precedence, then override, then preserve existing
+	if forceRecalculate {
+		// Force recalculation using latest FX rate, ignoring any override
+		s.calculateItemTargetAmount(existing, invoice.Currency)
+	} else if targetAmountOverride != nil {
+		// Manual override - use the provided value
+		existing.TargetCurrency = "USD"
+		existing.TargetAmount = *targetAmountOverride
+		// Calculate the implied FX rate from the override
+		if existing.Amount > 0 {
+			existing.FXRateUsed = *targetAmountOverride / existing.Amount
+		} else {
+			existing.FXRateUsed = 1.0
+		}
+	}
+	// else: preserve existing target_amount, target_currency, and fx_rate_used
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(existing).Error; err != nil {
@@ -399,19 +447,59 @@ func (s *invoiceService) GetOverdueInvoices(userID string) ([]models.Invoice, er
 }
 
 // updateInvoiceTotal recalculates and updates the invoice total from items
+// Sums both amount and target_amount from items
 func (s *invoiceService) updateInvoiceTotal(tx *gorm.DB, invoiceID uint) error {
-	var total float64
+	var result struct {
+		TotalAmount       float64
+		TotalTargetAmount float64
+	}
 	err := tx.Model(&models.InvoiceItem{}).
 		Where("invoice_id = ?", invoiceID).
-		Select("COALESCE(SUM(amount), 0)").
-		Scan(&total).Error
+		Select("COALESCE(SUM(amount), 0) as total_amount, COALESCE(SUM(target_amount), 0) as total_target_amount").
+		Scan(&result).Error
 	if err != nil {
 		return err
 	}
 
+	// Save updates
 	return tx.Model(&models.Invoice{}).
 		Where("id = ?", invoiceID).
-		Update("amount", total).Error
+		Updates(map[string]interface{}{
+			"amount":        result.TotalAmount,
+			"target_amount": result.TotalTargetAmount,
+		}).Error
+}
+
+// recalculateAllItemFX recalculates FX for all items when currency changes
+func (s *invoiceService) recalculateAllItemFX(tx *gorm.DB, invoiceID uint, currency string) error {
+	// Get all items for this invoice
+	var items []models.InvoiceItem
+	if err := tx.Where("invoice_id = ?", invoiceID).Find(&items).Error; err != nil {
+		return err
+	}
+
+	// Recalculate FX for each item
+	var totalTargetAmount float64
+	for i := range items {
+		s.calculateItemTargetAmount(&items[i], currency)
+		totalTargetAmount += items[i].TargetAmount
+
+		// Update item
+		if err := tx.Model(&models.InvoiceItem{}).
+			Where("id = ?", items[i].ID).
+			Updates(map[string]interface{}{
+				"target_currency": items[i].TargetCurrency,
+				"target_amount":   items[i].TargetAmount,
+				"fx_rate_used":    items[i].FXRateUsed,
+			}).Error; err != nil {
+			return err
+		}
+	}
+
+	// Update invoice target_amount
+	return tx.Model(&models.Invoice{}).
+		Where("id = ?", invoiceID).
+		Update("target_amount", totalTargetAmount).Error
 }
 
 // SetInvoiceTags sets the tags for an invoice by tag names
@@ -506,4 +594,30 @@ func (s *invoiceService) SetInvoiceTagsByID(userID string, invoiceID uint, tagID
 
 		return nil
 	})
+}
+
+// calculateItemTargetAmount calculates and sets the target amount (USD) for an invoice item
+func (s *invoiceService) calculateItemTargetAmount(item *models.InvoiceItem, invoiceCurrency string) {
+	// Default target currency to USD
+	item.TargetCurrency = "USD"
+
+	// If no FX service, use 1:1 rate
+	if s.fxService == nil {
+		item.TargetAmount = item.Amount
+		item.FXRateUsed = 1.0
+		return
+	}
+
+	// If same currency, no conversion needed
+	if invoiceCurrency == "USD" {
+		item.TargetAmount = item.Amount
+		item.FXRateUsed = 1.0
+		return
+	}
+
+	// Convert to USD
+	ctx := context.Background()
+	convertedAmount, rate, _ := s.fxService.ConvertAmount(ctx, item.Amount, invoiceCurrency, "USD")
+	item.TargetAmount = convertedAmount
+	item.FXRateUsed = rate
 }
