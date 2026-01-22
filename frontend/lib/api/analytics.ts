@@ -34,3 +34,9 @@ export async function getAnalyticsByReceiver(
     `/api/analytics/by-receiver?period=${period}`
   );
 }
+
+export async function getAnalyticsByTag(
+  period: AnalyticsPeriod = "1m"
+): Promise<AnalyticsByGroup> {
+  return apiClient<AnalyticsByGroup>(`/api/analytics/by-tag?period=${period}`);
+}

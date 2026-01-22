@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Category, Company, Receiver, Invoice, InvoiceStatus } from "@/lib/api/types";
+import { Category, Company, Receiver, Invoice, InvoiceStatus, Tag } from "@/lib/api/types";
 import { createInvoiceAction, updateInvoiceAction } from "@/lib/actions/invoice-actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -31,6 +31,7 @@ const invoiceSchema = z.object({
   category_id: z.coerce.number().optional().nullable(),
   company_id: z.coerce.number().optional().nullable(),
   receiver_id: z.coerce.number().optional().nullable(),
+  tag_ids: z.array(z.number()).optional(),
   status: z.enum(["paid", "unpaid", "overdue"]),
   due_date: z.string().optional().nullable(),
   invoice_started_at: z.string().optional().nullable(),
@@ -45,9 +46,10 @@ interface InvoiceFormProps {
   categories: Category[];
   companies: Company[];
   receivers: Receiver[];
+  tags: Tag[];
 }
 
-export function InvoiceForm({ invoice, categories, companies, receivers }: InvoiceFormProps) {
+export function InvoiceForm({ invoice, categories, companies, receivers, tags }: InvoiceFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!invoice;
@@ -67,6 +69,7 @@ export function InvoiceForm({ invoice, categories, companies, receivers }: Invoi
       category_id: invoice?.category_id || null,
       company_id: invoice?.company_id || null,
       receiver_id: invoice?.receiver_id || null,
+      tag_ids: invoice?.tags?.map((t) => t.id) || [],
       status: invoice?.status || "unpaid",
       due_date: invoice?.due_date?.split("T")[0] || "",
       invoice_started_at: invoice?.invoice_started_at?.split("T")[0] || "",
@@ -87,6 +90,7 @@ export function InvoiceForm({ invoice, categories, companies, receivers }: Invoi
         category_id: data.category_id || undefined,
         company_id: data.company_id || undefined,
         receiver_id: data.receiver_id || undefined,
+        tag_ids: data.tag_ids?.length ? data.tag_ids : undefined,
         due_date: data.due_date ? new Date(data.due_date).toISOString() : undefined,
         invoice_started_at: data.invoice_started_at
           ? new Date(data.invoice_started_at).toISOString()
@@ -214,6 +218,50 @@ export function InvoiceForm({ invoice, categories, companies, receivers }: Invoi
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <div className="flex flex-wrap gap-2 rounded-md border p-3 min-h-[42px]">
+              {tags.map((tag) => {
+                const isSelected = watch("tag_ids")?.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => {
+                      const currentTags = watch("tag_ids") || [];
+                      if (isSelected) {
+                        setValue("tag_ids", currentTags.filter((id) => id !== tag.id));
+                      } else {
+                        setValue("tag_ids", [...currentTags, tag.id]);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm transition-colors ${
+                      isSelected
+                        ? "ring-2 ring-offset-1"
+                        : "opacity-60 hover:opacity-100"
+                    }`}
+                    style={{
+                      backgroundColor: tag.color + "20",
+                      color: tag.color,
+                      borderColor: tag.color,
+                      border: `1px solid ${tag.color}`,
+                    }}
+                  >
+                    <div
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    {tag.name}
+                  </button>
+                );
+              })}
+              {tags.length === 0 && (
+                <span className="text-sm text-muted-foreground">No tags available</span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">Click to toggle tags</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -30,6 +30,7 @@ type APIServer struct {
 	categoryService        services.CategoryService
 	companyService         services.CompanyService
 	receiverService        services.ReceiverService
+	tagService             services.TagService
 	invoiceService         services.InvoiceService
 	uploadService          services.UploadService
 	fileUploadService      services.FileUploadService
@@ -48,6 +49,7 @@ func NewAPIServer(
 	categoryService services.CategoryService,
 	companyService services.CompanyService,
 	receiverService services.ReceiverService,
+	tagService services.TagService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 	fileUploadService services.FileUploadService,
@@ -117,6 +119,7 @@ func NewAPIServer(
 		categoryService:   categoryService,
 		companyService:    companyService,
 		receiverService:   receiverService,
+		tagService:        tagService,
 		invoiceService:    invoiceService,
 		uploadService:     uploadService,
 		fileUploadService: fileUploadService,
@@ -156,6 +159,7 @@ func (s *APIServer) SetupRoutes() {
 		s.categoryService,
 		s.companyService,
 		s.receiverService,
+		s.tagService,
 		s.invoiceService,
 		s.uploadService,
 		s.fileUploadService,

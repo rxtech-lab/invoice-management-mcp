@@ -32,9 +32,9 @@ func NewCreateCategoryTool(service services.CategoryService) *CreateCategoryTool
 func (t *CreateCategoryTool) GetTool() mcp.Tool {
 	return mcp.NewTool("create_category",
 		mcp.WithDescription("Create a new invoice category"),
-		mcp.WithString("name", mcp.Required(), mcp.Description("Category name")),
-		mcp.WithString("description", mcp.Description("Category description")),
-		mcp.WithString("color", mcp.Description("Hex color code (e.g., #FF5733)")),
+		mcp.WithString("name", mcp.Required(), mcp.Description("Category name"), mcp.MaxLength(100), mcp.Required()),
+		mcp.WithString("description", mcp.Description("Category description"), mcp.Required()),
+		mcp.WithString("color", mcp.Description("Hex color code (e.g., #FF5733). Please use different colors for different categories."), mcp.Required()),
 	)
 }
 

@@ -83,8 +83,11 @@ type Invoice struct {
 	// File attachment
 	OriginalDownloadLink string `gorm:"type:text" json:"original_download_link"`
 
-	// Tags stored as JSON
-	Tags StringArray `gorm:"type:text" json:"tags"`
+	// Tags - many-to-many relationship
+	Tags []InvoiceTag `gorm:"many2many:invoice_tag_mappings" json:"tags,omitempty"`
+
+	// LegacyTags stored as JSON (deprecated, kept for migration)
+	LegacyTags StringArray `gorm:"column:tags;type:text" json:"-"`
 
 	// Status and due date
 	Status  InvoiceStatus `gorm:"type:varchar(20);default:'unpaid'" json:"status"`

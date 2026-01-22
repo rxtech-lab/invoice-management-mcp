@@ -33,6 +33,7 @@ func main() {
 	categoryService := services.NewCategoryService(db)
 	companyService := services.NewCompanyService(db)
 	receiverService := services.NewReceiverService(db)
+	tagService := services.NewTagService(db)
 	invoiceService := services.NewInvoiceService(db)
 	uploadService := initUploadService()
 	fileUploadService := services.NewFileUploadService(db)
@@ -48,6 +49,7 @@ func main() {
 		invoiceService,
 		uploadService,
 		analyticsService,
+		tagService,
 	)
 
 	// Initialize API server
@@ -57,6 +59,7 @@ func main() {
 		categoryService,
 		companyService,
 		receiverService,
+		tagService,
 		invoiceService,
 		uploadService,
 		fileUploadService,

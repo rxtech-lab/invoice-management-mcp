@@ -7,6 +7,7 @@ import type {
   Receiver,
   CreateReceiverRequest,
   UpdateReceiverRequest,
+  MergeReceiversResponse,
 } from "@/lib/api/types";
 
 export async function createReceiverAction(
@@ -76,4 +77,32 @@ export async function deleteReceiverAndRedirect(id: number) {
     redirect("/receivers");
   }
   return result;
+}
+
+export async function mergeReceiversAction(
+  targetId: number,
+  sourceIds: number[]
+): Promise<{
+  success: boolean;
+  data?: MergeReceiversResponse;
+  error?: string;
+}> {
+  try {
+    const result = await apiClient<MergeReceiversResponse>(
+      "/api/receivers/merge",
+      {
+        method: "POST",
+        body: JSON.stringify({ target_id: targetId, source_ids: sourceIds }),
+      }
+    );
+    revalidatePath("/receivers");
+    revalidatePath("/invoices");
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to merge receivers",
+    };
+  }
 }

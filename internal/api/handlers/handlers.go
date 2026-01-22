@@ -23,6 +23,7 @@ type StrictHandlers struct {
 	categoryService   services.CategoryService
 	companyService    services.CompanyService
 	receiverService   services.ReceiverService
+	tagService        services.TagService
 	invoiceService    services.InvoiceService
 	uploadService     services.UploadService
 	fileUploadService services.FileUploadService
@@ -35,6 +36,7 @@ func NewStrictHandlers(
 	categoryService services.CategoryService,
 	companyService services.CompanyService,
 	receiverService services.ReceiverService,
+	tagService services.TagService,
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 	fileUploadService services.FileUploadService,
@@ -45,6 +47,7 @@ func NewStrictHandlers(
 		categoryService:   categoryService,
 		companyService:    companyService,
 		receiverService:   receiverService,
+		tagService:        tagService,
 		invoiceService:    invoiceService,
 		uploadService:     uploadService,
 		fileUploadService: fileUploadService,

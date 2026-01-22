@@ -15,6 +15,7 @@ type ReceiverService interface {
 	UpdateReceiver(userID string, receiver *models.InvoiceReceiver) error
 	DeleteReceiver(userID string, id uint) error
 	SearchReceivers(userID string, query string) ([]models.InvoiceReceiver, error)
+	MergeReceivers(userID string, targetID uint, sourceIDs []uint) (*models.InvoiceReceiver, int64, error)
 }
 
 type receiverService struct {
@@ -115,4 +116,54 @@ func (s *receiverService) SearchReceivers(userID string, query string) ([]models
 		Find(&receivers).Error
 
 	return receivers, err
+}
+
+// MergeReceivers merges multiple receivers into a target receiver
+// All invoices from source receivers are moved to the target receiver
+// Source receivers are then soft-deleted
+// Returns the updated target receiver and count of affected invoices
+func (s *receiverService) MergeReceivers(userID string, targetID uint, sourceIDs []uint) (*models.InvoiceReceiver, int64, error) {
+	var target *models.InvoiceReceiver
+	var affectedCount int64
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Verify target receiver ownership
+		var targetReceiver models.InvoiceReceiver
+		if err := tx.Where("id = ? AND user_id = ?", targetID, userID).First(&targetReceiver).Error; err != nil {
+			return fmt.Errorf("target receiver not found: %w", err)
+		}
+
+		// Verify all source receivers belong to the user
+		var sourceReceivers []models.InvoiceReceiver
+		if err := tx.Where("id IN ? AND user_id = ?", sourceIDs, userID).Find(&sourceReceivers).Error; err != nil {
+			return fmt.Errorf("error finding source receivers: %w", err)
+		}
+
+		if len(sourceReceivers) != len(sourceIDs) {
+			return fmt.Errorf("some source receivers not found or don't belong to user")
+		}
+
+		// Update all invoices from source receivers to target receiver
+		result := tx.Model(&models.Invoice{}).
+			Where("receiver_id IN ? AND user_id = ?", sourceIDs, userID).
+			Update("receiver_id", targetID)
+		if result.Error != nil {
+			return result.Error
+		}
+		affectedCount = result.RowsAffected
+
+		// Soft-delete source receivers
+		if err := tx.Where("id IN ? AND user_id = ?", sourceIDs, userID).Delete(&models.InvoiceReceiver{}).Error; err != nil {
+			return err
+		}
+
+		target = &targetReceiver
+		return nil
+	})
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return target, affectedCount, nil
 }

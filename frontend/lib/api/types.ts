@@ -79,6 +79,43 @@ export interface UpdateReceiverRequest {
   is_organization?: boolean;
 }
 
+export interface MergeReceiversRequest {
+  target_id: number;
+  source_ids: number[];
+}
+
+export interface MergeReceiversResponse {
+  receiver: Receiver;
+  merged_count: number;
+  invoices_updated: number;
+}
+
+// Tag
+export interface Tag {
+  id: number;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateTagRequest {
+  name: string;
+  color?: string;
+}
+
+export interface UpdateTagRequest {
+  name?: string;
+  color?: string;
+}
+
+export interface TagListOptions {
+  keyword?: string;
+  limit?: number;
+  offset?: number;
+}
+
 // Invoice Item
 export interface InvoiceItem {
   id: number;
@@ -121,7 +158,7 @@ export interface Invoice {
   receiver?: Receiver;
   items: InvoiceItem[];
   original_download_link: string;
-  tags: string[];
+  tags: Tag[];
   status: InvoiceStatus;
   due_date: string | null;
   created_at: string;
@@ -139,7 +176,7 @@ export interface CreateInvoiceRequest {
   company_id?: number;
   receiver_id?: number;
   original_download_link?: string;
-  tags?: string[];
+  tag_ids?: number[];
   status?: InvoiceStatus;
   due_date?: string;
   items?: CreateInvoiceItemRequest[];
@@ -156,7 +193,7 @@ export interface UpdateInvoiceRequest {
   company_id?: number;
   receiver_id?: number;
   original_download_link?: string;
-  tags?: string[];
+  tag_ids?: number[];
   status?: InvoiceStatus;
   due_date?: string;
 }
@@ -200,6 +237,7 @@ export interface InvoiceListOptions {
   category_id?: number;
   company_id?: number;
   receiver_id?: number;
+  tag_ids?: number[];
   status?: InvoiceStatus;
   sort_by?: "created_at" | "updated_at" | "amount" | "due_date" | "title";
   sort_order?: "asc" | "desc";

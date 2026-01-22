@@ -112,9 +112,7 @@ func (h *StrictHandlers) CreateInvoice(
 	if request.Body.OriginalDownloadLink != nil {
 		invoice.OriginalDownloadLink = *request.Body.OriginalDownloadLink
 	}
-	if request.Body.Tags != nil {
-		invoice.Tags = models.StringArray(*request.Body.Tags)
-	}
+	// Tags will be set after invoice creation using SetInvoiceTags
 	if request.Body.Status != nil {
 		invoice.Status = models.InvoiceStatus(*request.Body.Status)
 	} else {
@@ -141,6 +139,13 @@ func (h *StrictHandlers) CreateInvoice(
 
 	if err := h.invoiceService.CreateInvoice(userID, invoice); err != nil {
 		return generated.CreateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
+	}
+
+	// Set tags if provided
+	if request.Body.Tags != nil && len(*request.Body.Tags) > 0 {
+		if err := h.invoiceService.SetInvoiceTags(userID, invoice.ID, *request.Body.Tags); err != nil {
+			return generated.CreateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
+		}
 	}
 
 	// Reload to get relationships
@@ -213,9 +218,7 @@ func (h *StrictHandlers) UpdateInvoice(
 	if request.Body.OriginalDownloadLink != nil {
 		existing.OriginalDownloadLink = *request.Body.OriginalDownloadLink
 	}
-	if request.Body.Tags != nil {
-		existing.Tags = models.StringArray(*request.Body.Tags)
-	}
+	// Tags will be updated separately using SetInvoiceTags
 	if request.Body.Status != nil {
 		existing.Status = models.InvoiceStatus(*request.Body.Status)
 	}
@@ -225,6 +228,13 @@ func (h *StrictHandlers) UpdateInvoice(
 
 	if err := h.invoiceService.UpdateInvoice(userID, existing); err != nil {
 		return generated.UpdateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
+	}
+
+	// Update tags if provided
+	if request.Body.Tags != nil {
+		if err := h.invoiceService.SetInvoiceTags(userID, uint(request.Id), *request.Body.Tags); err != nil {
+			return generated.UpdateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
+		}
 	}
 
 	updated, _ := h.invoiceService.GetInvoiceByID(userID, uint(request.Id))

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/data-table";
 import { receiverColumns } from "@/components/data-table/columns/receiver-columns";
 import { getReceivers } from "@/lib/api/receivers";
+import { MergeReceiversDialog } from "@/components/receivers/merge-receivers-dialog";
 
 export default async function ReceiversPage() {
   const response = await getReceivers({ limit: 100 });
@@ -18,12 +19,17 @@ export default async function ReceiversPage() {
             Manage invoice receivers (individuals and organizations)
           </p>
         </div>
-        <Button asChild>
-          <Link href="/receivers/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Receiver
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          {receivers.length > 1 && (
+            <MergeReceiversDialog receivers={receivers} />
+          )}
+          <Button asChild>
+            <Link href="/receivers/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Receiver
+            </Link>
+          </Button>
+        </div>
       </div>
       <DataTable
         columns={receiverColumns}

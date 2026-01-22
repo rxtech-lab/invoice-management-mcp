@@ -6,6 +6,7 @@ import {
   FileText,
   Building2,
   Tags,
+  FolderTree,
   LayoutDashboard,
   Users,
 } from "lucide-react";
@@ -27,7 +28,8 @@ const navItems = [
   { title: "Invoices", href: "/invoices", icon: FileText },
   { title: "Companies", href: "/companies", icon: Building2 },
   { title: "Receivers", href: "/receivers", icon: Users },
-  { title: "Categories", href: "/categories", icon: Tags },
+  { title: "Categories", href: "/categories", icon: FolderTree },
+  { title: "Tags", href: "/tags", icon: Tags },
 ];
 
 interface AppSidebarProps {

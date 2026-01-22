@@ -97,3 +97,26 @@ func (h *StrictHandlers) GetAnalyticsByReceiver(
 
 	return generated.GetAnalyticsByReceiver200JSONResponse(analyticsByGroupToGenerated(result)), nil
 }
+
+// GetAnalyticsByTag implements generated.StrictServerInterface
+func (h *StrictHandlers) GetAnalyticsByTag(
+	ctx context.Context,
+	request generated.GetAnalyticsByTagRequestObject,
+) (generated.GetAnalyticsByTagResponseObject, error) {
+	userID, err := getUserID(ctx)
+	if err != nil {
+		return generated.GetAnalyticsByTag401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
+	}
+
+	period := "1m"
+	if request.Params.Period != nil {
+		period = string(*request.Params.Period)
+	}
+
+	result, err := h.analyticsService.GetByTag(userID, periodParamToService(period))
+	if err != nil {
+		return nil, err
+	}
+
+	return generated.GetAnalyticsByTag200JSONResponse(analyticsByGroupToGenerated(result)), nil
+}

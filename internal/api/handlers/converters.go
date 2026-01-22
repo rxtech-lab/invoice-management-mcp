@@ -120,10 +120,13 @@ func invoiceModelToGenerated(inv *models.Invoice) generated.Invoice {
 		items = &itemList
 	}
 
-	// Convert tags
+	// Convert tags - extract tag names from InvoiceTag objects
 	var tags *[]string
 	if len(inv.Tags) > 0 {
-		t := []string(inv.Tags)
+		t := make([]string, len(inv.Tags))
+		for i, tag := range inv.Tags {
+			t[i] = tag.Name
+		}
 		tags = &t
 	}
 

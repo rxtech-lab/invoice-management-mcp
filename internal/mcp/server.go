@@ -26,11 +26,12 @@ func NewMCPServer(
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 	analyticsService services.AnalyticsService,
+	tagService services.TagService,
 ) *MCPServer {
 	mcpServer := &MCPServer{
 		dbService: dbService,
 	}
-	mcpServer.initializeTools(categoryService, companyService, receiverService, invoiceService, uploadService, analyticsService)
+	mcpServer.initializeTools(categoryService, companyService, receiverService, invoiceService, uploadService, analyticsService, tagService)
 	return mcpServer
 }
 
@@ -42,6 +43,7 @@ func (s *MCPServer) initializeTools(
 	invoiceService services.InvoiceService,
 	uploadService services.UploadService,
 	analyticsService services.AnalyticsService,
+	tagService services.TagService,
 ) {
 	srv := server.NewMCPServer(
 		"Invoice Management MCP Server",
@@ -164,6 +166,38 @@ func (s *MCPServer) initializeTools(
 	invoiceStatisticsTool := tools.NewInvoiceStatisticsTool(analyticsService)
 	srv.AddTool(invoiceStatisticsTool.GetTool(), invoiceStatisticsTool.GetHandler())
 
+	advancedSearchTool := tools.NewAdvancedInvoiceSearchTool(analyticsService, invoiceService, tagService, categoryService, companyService, receiverService)
+	srv.AddTool(advancedSearchTool.GetTool(), advancedSearchTool.GetHandler())
+
+	// Tag Tools
+	createTagTool := tools.NewCreateTagTool(tagService)
+	srv.AddTool(createTagTool.GetTool(), createTagTool.GetHandler())
+
+	listTagsTool := tools.NewListTagsTool(tagService)
+	srv.AddTool(listTagsTool.GetTool(), listTagsTool.GetHandler())
+
+	getTagTool := tools.NewGetTagTool(tagService)
+	srv.AddTool(getTagTool.GetTool(), getTagTool.GetHandler())
+
+	updateTagTool := tools.NewUpdateTagTool(tagService)
+	srv.AddTool(updateTagTool.GetTool(), updateTagTool.GetHandler())
+
+	deleteTagTool := tools.NewDeleteTagTool(tagService)
+	srv.AddTool(deleteTagTool.GetTool(), deleteTagTool.GetHandler())
+
+	addTagToInvoiceTool := tools.NewAddTagToInvoiceTool(tagService)
+	srv.AddTool(addTagToInvoiceTool.GetTool(), addTagToInvoiceTool.GetHandler())
+
+	removeTagFromInvoiceTool := tools.NewRemoveTagFromInvoiceTool(tagService)
+	srv.AddTool(removeTagFromInvoiceTool.GetTool(), removeTagFromInvoiceTool.GetHandler())
+
+	searchInvoicesByTagsTool := tools.NewSearchInvoicesByTagsTool(tagService)
+	srv.AddTool(searchInvoicesByTagsTool.GetTool(), searchInvoicesByTagsTool.GetHandler())
+
+	// Merge Receivers Tool
+	mergeReceiversTool := tools.NewMergeReceiversTool(receiverService)
+	srv.AddTool(mergeReceiversTool.GetTool(), mergeReceiversTool.GetHandler())
+
 	s.server = srv
 }
 
@@ -241,7 +275,38 @@ func getToolInstructions(category string) string {
    Parameters: receiver_id (required), name, is_organization
 
 5. delete_receiver - Delete a receiver
-   Parameters: receiver_id (required)`
+   Parameters: receiver_id (required)
+
+6. merge_receivers - Merge multiple receivers into one
+   Parameters: target_id (required), source_ids (required array)
+   All invoices from source receivers will be moved to the target receiver.`
+
+	case "tag":
+		return `Tag Management Tools:
+
+1. create_tag - Create a new invoice tag
+   Parameters: name (required), color (hex code, default #6B7280)
+
+2. list_tags - List all tags with optional search
+   Parameters: keyword, limit, offset
+
+3. get_tag - Get a tag by ID
+   Parameters: tag_id (required)
+
+4. update_tag - Update an existing tag
+   Parameters: tag_id (required), name, color
+
+5. delete_tag - Delete a tag
+   Parameters: tag_id (required)
+
+6. add_tag_to_invoice - Add a tag to an invoice
+   Parameters: invoice_id (required), tag_id (required)
+
+7. remove_tag_from_invoice - Remove a tag from an invoice
+   Parameters: invoice_id (required), tag_id (required)
+
+8. search_invoices_by_tag - Find invoices with a specific tag
+   Parameters: tag_id (required), limit, offset`
 
 	case "invoice":
 		return `Invoice Management Tools:
@@ -303,7 +368,7 @@ Statistics Tools:
 	case "all":
 		return `Invoice Management MCP Tools Overview:
 
-This MCP server provides tools for managing invoices, categories, companies, receivers, and file uploads.
+This MCP server provides tools for managing invoices, categories, companies, receivers, tags, and file uploads.
 
 CATEGORY MANAGEMENT (5 tools):
 - create_category: Create a new category
@@ -319,12 +384,23 @@ COMPANY MANAGEMENT (5 tools):
 - update_company: Update a company
 - delete_company: Delete a company
 
-RECEIVER MANAGEMENT (5 tools):
+RECEIVER MANAGEMENT (6 tools):
 - create_receiver: Create a new receiver
 - list_receivers: List receivers with search
 - get_receiver: Get receiver details
 - update_receiver: Update a receiver
 - delete_receiver: Delete a receiver
+- merge_receivers: Merge multiple receivers into one
+
+TAG MANAGEMENT (8 tools):
+- create_tag: Create a new tag with name and color
+- list_tags: List tags with search
+- get_tag: Get tag details
+- update_tag: Update a tag
+- delete_tag: Delete a tag
+- add_tag_to_invoice: Associate a tag with an invoice
+- remove_tag_from_invoice: Remove a tag from an invoice
+- search_invoices_by_tag: Find invoices with a specific tag
 
 INVOICE MANAGEMENT (10 tools):
 - create_invoice: Create a new invoice with items
@@ -341,9 +417,11 @@ INVOICE MANAGEMENT (10 tools):
 FILE UPLOAD (1 tool):
 - get_presigned_url: Get URL for file upload
 
-STATISTICS (1 tool):
+STATISTICS (2 tools):
 - invoice_statistics: Get statistics with period/grouping/aggregations
   Supports: "last_week day by day", "max spend last month", "compare by category"
+- advanced_invoice_search: Search across title, category, company, receiver, tags
+  Supports: "How much did I spend on Marriott?", "Total travel expenses"
 
 All tools require authentication. Invoices are user-scoped.`
 

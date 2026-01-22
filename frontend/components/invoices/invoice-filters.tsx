@@ -12,19 +12,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X } from "lucide-react";
-import type { Category, Company, Receiver } from "@/lib/api/types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, X, Tags } from "lucide-react";
+import type { Category, Company, Receiver, Tag } from "@/lib/api/types";
 
 interface InvoiceFiltersProps {
   categories: Category[];
   companies: Company[];
   receivers: Receiver[];
+  tags: Tag[];
 }
 
 export function InvoiceFilters({
   categories,
   companies,
   receivers,
+  tags,
 }: InvoiceFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,6 +43,8 @@ export function InvoiceFilters({
   const companyId = searchParams.get("company_id") || "all";
   const receiverId = searchParams.get("receiver_id") || "all";
   const status = searchParams.get("status") || "all";
+  const tagIdsParam = searchParams.get("tag_ids") || "";
+  const selectedTagIds = tagIdsParam ? tagIdsParam.split(",").map(Number) : [];
 
   // Local state for search input with debounce
   const [searchTerm, setSearchTerm] = useState(keyword);
@@ -76,7 +86,16 @@ export function InvoiceFilters({
     categoryId !== "all" ||
     companyId !== "all" ||
     receiverId !== "all" ||
-    status !== "all";
+    status !== "all" ||
+    selectedTagIds.length > 0;
+
+  // Toggle a tag selection
+  const toggleTag = (tagId: number) => {
+    const newTagIds = selectedTagIds.includes(tagId)
+      ? selectedTagIds.filter((id) => id !== tagId)
+      : [...selectedTagIds, tagId];
+    updateParams({ tag_ids: newTagIds.length > 0 ? newTagIds.join(",") : null });
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -160,6 +179,53 @@ export function InvoiceFilters({
           <SelectItem value="overdue">Overdue</SelectItem>
         </SelectContent>
       </Select>
+
+      {/* Tag Filter (Multi-select) */}
+      {tags.length > 0 && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-[180px] justify-start">
+              <Tags className="mr-2 h-4 w-4" />
+              {selectedTagIds.length > 0
+                ? `${selectedTagIds.length} tag${selectedTagIds.length > 1 ? "s" : ""}`
+                : "All Tags"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[200px] p-2" align="start">
+            <div className="space-y-2">
+              {tags.map((tag) => (
+                <div key={tag.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`tag-${tag.id}`}
+                    checked={selectedTagIds.includes(tag.id)}
+                    onCheckedChange={() => toggleTag(tag.id)}
+                  />
+                  <label
+                    htmlFor={`tag-${tag.id}`}
+                    className="flex items-center gap-2 text-sm cursor-pointer flex-1"
+                  >
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    {tag.name}
+                  </label>
+                </div>
+              ))}
+              {selectedTagIds.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => updateParams({ tag_ids: null })}
+                >
+                  Clear tags
+                </Button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       {/* Clear Filters */}
       {hasFilters && (

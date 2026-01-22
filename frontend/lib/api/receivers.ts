@@ -5,6 +5,8 @@ import type {
   ReceiverListOptions,
   CreateReceiverRequest,
   UpdateReceiverRequest,
+  MergeReceiversRequest,
+  MergeReceiversResponse,
 } from "./types";
 
 export async function getReceivers(
@@ -47,4 +49,13 @@ export async function updateReceiver(
 
 export async function deleteReceiver(id: number): Promise<void> {
   return apiClient<void>(`/api/receivers/${id}`, { method: "DELETE" });
+}
+
+export async function mergeReceivers(
+  data: MergeReceiversRequest
+): Promise<MergeReceiversResponse> {
+  return apiClient<MergeReceiversResponse>("/api/receivers/merge", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
