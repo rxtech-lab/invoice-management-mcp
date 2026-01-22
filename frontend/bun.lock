@@ -11,7 +11,7 @@
         "@base-ui/react": "^1.1.0",
         "@hookform/resolvers": "^5.0.1",
         "@modelcontextprotocol/sdk": "^1.25.2",
-        "@rx-lab/dashboard-searching-ui": "^1.1.1",
+        "@rx-lab/dashboard-searching-ui": "^1.1.2",
         "@tanstack/react-query": "^5.80.7",
         "@tanstack/react-table": "^8.21.3",
         "@uidotdev/usehooks": "^2.4.1",
@@ -428,7 +428,7 @@
 
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, "sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g=="],
 
-    "@rx-lab/dashboard-searching-ui": ["@rx-lab/dashboard-searching-ui@1.1.1", "", { "dependencies": { "@radix-ui/react-context-menu": "^2.2.16", "@radix-ui/react-dialog": "^1.1.15", "@radix-ui/react-scroll-area": "^1.2.10", "@radix-ui/react-slot": "^1.2.4", "@radix-ui/react-tooltip": "^1.2.8", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "cmdk": "^1.1.1", "lucide-react": "^0.562.0", "tailwind-merge": "^3.0.0" }, "peerDependencies": { "@ai-sdk/react": ">=1.0.0", "ai": ">=4.0.0 || >=5.0.0 || >=6.0.0", "framer-motion": ">=10.0.0", "react": "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0", "react-markdown": ">=9.0.0" }, "optionalPeers": ["@ai-sdk/react", "ai"] }, "sha512-ET4NfVJWoSjI33Yr+zsN+517occuFGPdRJA53jkkPZw9Mz48hFVa9Y4LKjRjVtd+KeuF+oxX20ymNfA9FDWaYQ=="],
+    "@rx-lab/dashboard-searching-ui": ["@rx-lab/dashboard-searching-ui@1.1.2", "", { "dependencies": { "@radix-ui/react-context-menu": "^2.2.16", "@radix-ui/react-dialog": "^1.1.15", "@radix-ui/react-scroll-area": "^1.2.10", "@radix-ui/react-slot": "^1.2.4", "@radix-ui/react-tooltip": "^1.2.8", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "cmdk": "^1.1.1", "lucide-react": "^0.562.0", "tailwind-merge": "^3.0.0" }, "peerDependencies": { "@ai-sdk/react": ">=1.0.0", "ai": ">=4.0.0 || >=5.0.0 || >=6.0.0", "framer-motion": ">=10.0.0", "react": "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0", "react-markdown": ">=9.0.0" }, "optionalPeers": ["@ai-sdk/react", "ai"] }, "sha512-ZgUh+hBP8dVgGXk7Q24k5o/y+86xB4901zifh1vanujaftTpCU8UO19xOTGtClm+UEcVL8kupDvLYWGfrDNoKw=="],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
 
