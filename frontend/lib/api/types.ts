@@ -158,7 +158,7 @@ export interface Invoice {
   receiver?: Receiver;
   items: InvoiceItem[];
   original_download_link: string;
-  tags: Tag[];
+  tags: { id: number; name: string }[];
   status: InvoiceStatus;
   due_date: string | null;
   created_at: string;

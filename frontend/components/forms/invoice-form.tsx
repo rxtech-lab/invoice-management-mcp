@@ -15,13 +15,34 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Category, Company, Receiver, Invoice, InvoiceStatus, Tag } from "@/lib/api/types";
-import { createInvoiceAction, updateInvoiceAction } from "@/lib/actions/invoice-actions";
+import {
+  Category,
+  Company,
+  Receiver,
+  Invoice,
+  InvoiceStatus,
+  Tag,
+} from "@/lib/api/types";
+import {
+  createInvoiceAction,
+  updateInvoiceAction,
+} from "@/lib/actions/invoice-actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { FileUpload } from "@/components/ui/file-upload";
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChip,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 
 // Note: amount is not in the schema - it's calculated from invoice items
 const invoiceSchema = z.object({
@@ -49,9 +70,17 @@ interface InvoiceFormProps {
   tags: Tag[];
 }
 
-export function InvoiceForm({ invoice, categories, companies, receivers, tags }: InvoiceFormProps) {
+export function InvoiceForm({
+  invoice,
+  categories,
+  companies,
+  receivers,
+  tags,
+}: InvoiceFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
+  const tagAnchorRef = useComboboxAnchor();
   const isEditing = !!invoice;
 
   const {
@@ -59,8 +88,9 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<InvoiceFormData>({
+    mode: "onChange",
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       title: invoice?.title || "",
@@ -69,7 +99,10 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
       category_id: invoice?.category_id || null,
       company_id: invoice?.company_id || null,
       receiver_id: invoice?.receiver_id || null,
-      tag_ids: invoice?.tags?.map((t) => t.id) || [],
+      tag_ids:
+        invoice?.tags
+          ?.map((t) => t.id)
+          .filter((id): id is number => typeof id === "number") || [],
       status: invoice?.status || "unpaid",
       due_date: invoice?.due_date?.split("T")[0] || "",
       invoice_started_at: invoice?.invoice_started_at?.split("T")[0] || "",
@@ -91,7 +124,9 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
         company_id: data.company_id || undefined,
         receiver_id: data.receiver_id || undefined,
         tag_ids: data.tag_ids?.length ? data.tag_ids : undefined,
-        due_date: data.due_date ? new Date(data.due_date).toISOString() : undefined,
+        due_date: data.due_date
+          ? new Date(data.due_date).toISOString()
+          : undefined,
         invoice_started_at: data.invoice_started_at
           ? new Date(data.invoice_started_at).toISOString()
           : undefined,
@@ -124,10 +159,23 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
         <CardTitle>{isEditing ? "Edit Invoice" : "Create Invoice"}</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={handleSubmit(onSubmit, (errors) => {
+            const firstError = Object.values(errors)[0];
+            const message = Array.isArray(firstError)
+              ? "Invalid form data"
+              : firstError?.message || "Please fix the form errors";
+            toast.error(message);
+          })}
+          className="space-y-6"
+        >
           <div className="space-y-2">
             <Label htmlFor="title">Title *</Label>
-            <Input id="title" {...register("title")} placeholder="Invoice title" />
+            <Input
+              id="title"
+              {...register("title")}
+              placeholder="Invoice title"
+            />
             {errors.title && (
               <p className="text-sm text-destructive">{errors.title.message}</p>
             )}
@@ -145,8 +193,15 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
 
           <div className="space-y-2">
             <Label htmlFor="currency">Currency</Label>
-            <Input id="currency" {...register("currency")} placeholder="USD" className="max-w-xs" />
-            <p className="text-sm text-muted-foreground">Amount is calculated from invoice items</p>
+            <Input
+              id="currency"
+              {...register("currency")}
+              placeholder="USD"
+              className="max-w-xs"
+            />
+            <p className="text-sm text-muted-foreground">
+              Amount is calculated from invoice items
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -154,7 +209,9 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
               <Label>Category</Label>
               <Select
                 value={watch("category_id")?.toString() || ""}
-                onValueChange={(v) => setValue("category_id", v ? Number(v) : null)}
+                onValueChange={(v) =>
+                  setValue("category_id", v ? Number(v) : null)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
@@ -180,7 +237,9 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
               <Label>Company</Label>
               <Select
                 value={watch("company_id")?.toString() || ""}
-                onValueChange={(v) => setValue("company_id", v ? Number(v) : null)}
+                onValueChange={(v) =>
+                  setValue("company_id", v ? Number(v) : null)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
@@ -200,7 +259,9 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
             <Label>Receiver</Label>
             <Select
               value={watch("receiver_id")?.toString() || ""}
-              onValueChange={(v) => setValue("receiver_id", v ? Number(v) : null)}
+              onValueChange={(v) =>
+                setValue("receiver_id", v ? Number(v) : null)
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select receiver" />
@@ -211,7 +272,9 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
                     <div className="flex items-center gap-2">
                       {rec.name}
                       {rec.is_organization && (
-                        <span className="text-xs text-muted-foreground">(Org)</span>
+                        <span className="text-xs text-muted-foreground">
+                          (Org)
+                        </span>
                       )}
                     </div>
                   </SelectItem>
@@ -222,46 +285,51 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
 
           <div className="space-y-2">
             <Label>Tags</Label>
-            <div className="flex flex-wrap gap-2 rounded-md border p-3 min-h-[42px]">
-              {tags.map((tag) => {
-                const isSelected = watch("tag_ids")?.includes(tag.id);
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => {
-                      const currentTags = watch("tag_ids") || [];
-                      if (isSelected) {
-                        setValue("tag_ids", currentTags.filter((id) => id !== tag.id));
-                      } else {
-                        setValue("tag_ids", [...currentTags, tag.id]);
-                      }
-                    }}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm transition-colors ${
-                      isSelected
-                        ? "ring-2 ring-offset-1"
-                        : "opacity-60 hover:opacity-100"
-                    }`}
-                    style={{
-                      backgroundColor: tag.color + "20",
-                      color: tag.color,
-                      borderColor: tag.color,
-                      border: `1px solid ${tag.color}`,
-                    }}
-                  >
-                    <div
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    {tag.name}
-                  </button>
-                );
-              })}
-              {tags.length === 0 && (
-                <span className="text-sm text-muted-foreground">No tags available</span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">Click to toggle tags</p>
+            <Combobox
+              multiple
+              value={watch("tag_ids") || []}
+              onValueChange={(newValue) =>
+                setValue("tag_ids", newValue as number[])
+              }
+            >
+              <ComboboxChips ref={tagAnchorRef}>
+                {(watch("tag_ids") || []).map((tagId) => {
+                  const tag = tags.find((t) => t.id === tagId);
+                  return tag ? (
+                    <ComboboxChip key={tagId} value={tagId}>
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </ComboboxChip>
+                  ) : null;
+                })}
+                <ComboboxChipsInput
+                  placeholder={watch("tag_ids")?.length ? "" : "Search tags..."}
+                  value={tagSearch}
+                  onChange={(e) => setTagSearch(e.target.value)}
+                />
+              </ComboboxChips>
+              <ComboboxContent anchor={tagAnchorRef}>
+                <ComboboxList>
+                  <ComboboxEmpty>No tags found</ComboboxEmpty>
+                  {tags
+                    .filter((tag) =>
+                      tag.name.toLowerCase().includes(tagSearch.toLowerCase()),
+                    )
+                    .map((tag) => (
+                      <ComboboxItem key={tag.id} value={tag.id}>
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        {tag.name}
+                      </ComboboxItem>
+                    ))}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -318,7 +386,9 @@ export function InvoiceForm({ invoice, categories, companies, receivers, tags }:
 
           <div className="flex gap-4">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               {isEditing ? "Update Invoice" : "Create Invoice"}
             </Button>
             <Button

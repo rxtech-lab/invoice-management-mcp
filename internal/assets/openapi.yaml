@@ -1513,6 +1513,20 @@ components:
           type: string
           format: date-time
 
+    InvoiceTagReference:
+      type: object
+      description: Minimal tag reference included in invoice responses
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          description: Tag ID
+        name:
+          type: string
+          description: Tag name
+
     CreateTagRequest:
       type: object
       required:
@@ -1646,7 +1660,7 @@ components:
         tags:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/InvoiceTagReference'
           description: Tags for categorization
         status:
           $ref: '#/components/schemas/InvoiceStatus'
@@ -1690,10 +1704,11 @@ components:
         original_download_link:
           type: string
           format: uri
-        tags:
+        tag_ids:
           type: array
           items:
-            type: string
+            type: integer
+          description: Tag IDs to associate with the invoice
         status:
           $ref: '#/components/schemas/InvoiceStatus'
         due_date:
@@ -1746,10 +1761,11 @@ components:
         original_download_link:
           type: string
           format: uri
-        tags:
+        tag_ids:
           type: array
           items:
-            type: string
+            type: integer
+          description: Tag IDs to associate with the invoice
         status:
           $ref: '#/components/schemas/InvoiceStatus'
         due_date:

@@ -120,12 +120,15 @@ func invoiceModelToGenerated(inv *models.Invoice) generated.Invoice {
 		items = &itemList
 	}
 
-	// Convert tags - extract tag names from InvoiceTag objects
-	var tags *[]string
+	// Convert tags - include id and name
+	var tags *[]generated.InvoiceTagReference
 	if len(inv.Tags) > 0 {
-		t := make([]string, len(inv.Tags))
+		t := make([]generated.InvoiceTagReference, len(inv.Tags))
 		for i, tag := range inv.Tags {
-			t[i] = tag.Name
+			t[i] = generated.InvoiceTagReference{
+				Id:   int(tag.ID),
+				Name: tag.Name,
+			}
 		}
 		tags = &t
 	}

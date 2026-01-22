@@ -47,6 +47,7 @@ type InvoiceService interface {
 
 	// Tag management
 	SetInvoiceTags(userID string, invoiceID uint, tagNames []string) error
+	SetInvoiceTagsByID(userID string, invoiceID uint, tagIDs []int) error
 }
 
 type invoiceService struct {
@@ -401,6 +402,46 @@ func (s *invoiceService) SetInvoiceTags(userID string, invoiceID uint, tagNames 
 				if err := tx.Create(&tag).Error; err != nil {
 					return err
 				}
+			}
+
+			// Create mapping
+			mapping := models.InvoiceTagMapping{
+				InvoiceID: invoiceID,
+				TagID:     tag.ID,
+			}
+			if err := tx.Create(&mapping).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// SetInvoiceTagsByID sets tags for an invoice using tag IDs
+func (s *invoiceService) SetInvoiceTagsByID(userID string, invoiceID uint, tagIDs []int) error {
+	// Verify invoice ownership
+	_, err := s.GetInvoiceByID(userID, invoiceID)
+	if err != nil {
+		return fmt.Errorf("invoice not found: %w", err)
+	}
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Delete existing tag mappings for this invoice
+		if err := tx.Where("invoice_id = ?", invoiceID).Delete(&models.InvoiceTagMapping{}).Error; err != nil {
+			return err
+		}
+
+		if len(tagIDs) == 0 {
+			return nil
+		}
+
+		// For each tag ID, verify it exists and belongs to user, then create mapping
+		for _, tagID := range tagIDs {
+			var tag models.InvoiceTag
+			err := tx.Where("id = ? AND user_id = ?", tagID, userID).First(&tag).Error
+			if err != nil {
+				return fmt.Errorf("tag with ID %d not found or not owned by user", tagID)
 			}
 
 			// Create mapping

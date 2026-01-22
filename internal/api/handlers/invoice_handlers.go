@@ -142,8 +142,8 @@ func (h *StrictHandlers) CreateInvoice(
 	}
 
 	// Set tags if provided
-	if request.Body.Tags != nil && len(*request.Body.Tags) > 0 {
-		if err := h.invoiceService.SetInvoiceTags(userID, invoice.ID, *request.Body.Tags); err != nil {
+	if request.Body.TagIds != nil && len(*request.Body.TagIds) > 0 {
+		if err := h.invoiceService.SetInvoiceTagsByID(userID, invoice.ID, *request.Body.TagIds); err != nil {
 			return generated.CreateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
 		}
 	}
@@ -231,8 +231,8 @@ func (h *StrictHandlers) UpdateInvoice(
 	}
 
 	// Update tags if provided
-	if request.Body.Tags != nil {
-		if err := h.invoiceService.SetInvoiceTags(userID, uint(request.Id), *request.Body.Tags); err != nil {
+	if request.Body.TagIds != nil {
+		if err := h.invoiceService.SetInvoiceTagsByID(userID, uint(request.Id), *request.Body.TagIds); err != nil {
 			return generated.UpdateInvoice400JSONResponse{BadRequestJSONResponse: badRequest(err.Error())}, nil
 		}
 	}
