@@ -8,6 +8,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// CreateInvoiceResult contains the result of creating an invoice
+type CreateInvoiceResult struct {
+	Invoice     *models.Invoice
+	IsDuplicate bool
+	Message     string
+}
+
 // InvoiceListOptions contains options for listing invoices
 type InvoiceListOptions struct {
 	Keyword    string
@@ -28,7 +35,7 @@ type InvoiceListOptions struct {
 // InvoiceService handles invoice business logic
 type InvoiceService interface {
 	// Invoice CRUD
-	CreateInvoice(userID string, invoice *models.Invoice) error
+	CreateInvoice(userID string, invoice *models.Invoice) (*CreateInvoiceResult, error)
 	GetInvoiceByID(userID string, id uint) (*models.Invoice, error)
 	ListInvoices(userID string, opts InvoiceListOptions) ([]models.Invoice, int64, error)
 	UpdateInvoice(userID string, invoice *models.Invoice) error
@@ -61,7 +68,8 @@ func NewInvoiceService(db *gorm.DB) InvoiceService {
 
 // CreateInvoice creates a new invoice with optional items
 // Amount is always calculated from items (0 if no items)
-func (s *invoiceService) CreateInvoice(userID string, invoice *models.Invoice) error {
+// Returns existing invoice if a duplicate is found (same amount, dates, and receiver)
+func (s *invoiceService) CreateInvoice(userID string, invoice *models.Invoice) (*CreateInvoiceResult, error) {
 	invoice.UserID = userID
 
 	// Calculate item amounts and total - amount is always calculated from items
@@ -72,7 +80,49 @@ func (s *invoiceService) CreateInvoice(userID string, invoice *models.Invoice) e
 	}
 	invoice.Amount = totalAmount
 
-	return s.db.Create(invoice).Error
+	// Check for duplicate invoice
+	var existing models.Invoice
+	query := s.db.Where("user_id = ? AND amount = ?", userID, totalAmount)
+
+	// Handle nullable dates - null matches null
+	if invoice.InvoiceStartedAt != nil {
+		query = query.Where("invoice_started_at = ?", *invoice.InvoiceStartedAt)
+	} else {
+		query = query.Where("invoice_started_at IS NULL")
+	}
+
+	if invoice.InvoiceEndedAt != nil {
+		query = query.Where("invoice_ended_at = ?", *invoice.InvoiceEndedAt)
+	} else {
+		query = query.Where("invoice_ended_at IS NULL")
+	}
+
+	// Handle nullable receiver_id
+	if invoice.ReceiverID != nil {
+		query = query.Where("receiver_id = ?", *invoice.ReceiverID)
+	} else {
+		query = query.Where("receiver_id IS NULL")
+	}
+
+	err := query.Preload("Category").Preload("Company").Preload("Receiver").Preload("Items").Preload("Tags").First(&existing).Error
+	if err == nil {
+		// Duplicate found - return existing invoice
+		return &CreateInvoiceResult{
+			Invoice:     &existing,
+			IsDuplicate: true,
+			Message:     "Duplicate invoice found with matching amount, dates, and receiver",
+		}, nil
+	}
+
+	// No duplicate found, create new invoice
+	if err := s.db.Create(invoice).Error; err != nil {
+		return nil, err
+	}
+
+	return &CreateInvoiceResult{
+		Invoice:     invoice,
+		IsDuplicate: false,
+	}, nil
 }
 
 // GetInvoiceByID retrieves an invoice by ID with related data

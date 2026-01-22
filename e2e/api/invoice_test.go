@@ -68,9 +68,15 @@ func (s *InvoiceTestSuite) TestListInvoices() {
 	categoryID, _ := s.setup.CreateTestCategory("Test Category")
 	companyID, _ := s.setup.CreateTestCompany("Test Company")
 
-	_, err := s.setup.CreateTestInvoice("Invoice 1", &categoryID, &companyID)
+	// Create invoices with different amounts to avoid duplicate detection
+	invoiceID1, err := s.setup.CreateTestInvoice("Invoice 1", &categoryID, &companyID)
 	s.Require().NoError(err)
-	_, err = s.setup.CreateTestInvoice("Invoice 2", &categoryID, &companyID)
+	_, err = s.setup.CreateTestInvoiceItem(invoiceID1, "Item 1", 1, 100.00)
+	s.Require().NoError(err)
+
+	invoiceID2, err := s.setup.CreateTestInvoice("Invoice 2", &categoryID, &companyID)
+	s.Require().NoError(err)
+	_, err = s.setup.CreateTestInvoiceItem(invoiceID2, "Item 2", 1, 200.00) // Different amount
 	s.Require().NoError(err)
 
 	resp, err := s.setup.MakeRequest("GET", "/api/invoices", nil)
@@ -279,6 +285,293 @@ func (s *InvoiceTestSuite) TestDeleteInvoiceItem() {
 	resp, err := s.setup.MakeRequest("DELETE", "/api/invoices/"+uintToString(invoiceID)+"/items/"+uintToString(itemID), nil)
 	s.Require().NoError(err)
 	s.Equal(http.StatusNoContent, resp.StatusCode)
+}
+
+func (s *InvoiceTestSuite) TestCreateInvoice_DuplicateDetection() {
+	// Create a receiver for the test
+	receiverID, err := s.setup.CreateTestReceiver("Test Receiver", true)
+	s.Require().NoError(err)
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC)
+
+	// Create first invoice with specific dates and receiver
+	invoice1 := map[string]interface{}{
+		"title":              "January Invoice",
+		"description":        "Monthly services",
+		"currency":           "USD",
+		"receiver_id":        receiverID,
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		"status":             "unpaid",
+		"items": []map[string]interface{}{
+			{
+				"description": "Service",
+				"quantity":    1,
+				"unit_price":  100.00,
+			},
+		},
+	}
+
+	resp1, err := s.setup.MakeRequest("POST", "/api/invoices", invoice1)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp1.StatusCode)
+
+	result1, err := s.setup.ReadResponseBody(resp1)
+	s.Require().NoError(err)
+	firstInvoiceID := result1["id"]
+
+	// Create second invoice with same amount (from items), dates, and receiver - should be detected as duplicate
+	invoice2 := map[string]interface{}{
+		"title":              "Different Title - Same Invoice",
+		"description":        "Different description",
+		"currency":           "EUR", // Different currency
+		"receiver_id":        receiverID,
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		"status":             "paid",
+		"items": []map[string]interface{}{
+			{
+				"description": "Different item description",
+				"quantity":    2,
+				"unit_price":  50.00, // Same total: 2 * 50 = 100
+			},
+		},
+	}
+
+	resp2, err := s.setup.MakeRequest("POST", "/api/invoices", invoice2)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp2.StatusCode)
+
+	result2, err := s.setup.ReadResponseBody(resp2)
+	s.Require().NoError(err)
+
+	// Should return the first invoice (duplicate detected)
+	s.Equal(firstInvoiceID, result2["id"], "Should return the existing invoice ID when duplicate detected")
+	s.Equal("January Invoice", result2["title"], "Should return the original invoice title")
+}
+
+func (s *InvoiceTestSuite) TestCreateInvoice_DifferentAmountNotDuplicate() {
+	receiverID, err := s.setup.CreateTestReceiver("Test Receiver 2", true)
+	s.Require().NoError(err)
+
+	startDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC)
+
+	// Create first invoice
+	invoice1 := map[string]interface{}{
+		"title":              "February Invoice 1",
+		"receiver_id":        receiverID,
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 100.00},
+		},
+	}
+
+	resp1, err := s.setup.MakeRequest("POST", "/api/invoices", invoice1)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp1.StatusCode)
+
+	result1, err := s.setup.ReadResponseBody(resp1)
+	s.Require().NoError(err)
+	firstInvoiceID := result1["id"]
+
+	// Create second invoice with different amount - should NOT be duplicate
+	invoice2 := map[string]interface{}{
+		"title":              "February Invoice 2",
+		"receiver_id":        receiverID,
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 200.00}, // Different amount
+		},
+	}
+
+	resp2, err := s.setup.MakeRequest("POST", "/api/invoices", invoice2)
+	s.Require().NoError(err)
+	s.Equal(http.StatusCreated, resp2.StatusCode)
+
+	result2, err := s.setup.ReadResponseBody(resp2)
+	s.Require().NoError(err)
+
+	// Should be a new invoice (different amount)
+	s.NotEqual(firstInvoiceID, result2["id"], "Should create new invoice when amount differs")
+}
+
+func (s *InvoiceTestSuite) TestCreateInvoice_DifferentDatesNotDuplicate() {
+	receiverID, err := s.setup.CreateTestReceiver("Test Receiver 3", true)
+	s.Require().NoError(err)
+
+	// Create first invoice with January dates
+	invoice1 := map[string]interface{}{
+		"title":              "January Invoice",
+		"receiver_id":        receiverID,
+		"invoice_started_at": time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"invoice_ended_at":   time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 100.00},
+		},
+	}
+
+	resp1, err := s.setup.MakeRequest("POST", "/api/invoices", invoice1)
+	s.Require().NoError(err)
+
+	result1, err := s.setup.ReadResponseBody(resp1)
+	s.Require().NoError(err)
+	firstInvoiceID := result1["id"]
+
+	// Create second invoice with February dates (same amount) - should NOT be duplicate
+	invoice2 := map[string]interface{}{
+		"title":              "February Invoice",
+		"receiver_id":        receiverID,
+		"invoice_started_at": time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"invoice_ended_at":   time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 100.00}, // Same amount
+		},
+	}
+
+	resp2, err := s.setup.MakeRequest("POST", "/api/invoices", invoice2)
+	s.Require().NoError(err)
+
+	result2, err := s.setup.ReadResponseBody(resp2)
+	s.Require().NoError(err)
+
+	// Should be a new invoice (different dates)
+	s.NotEqual(firstInvoiceID, result2["id"], "Should create new invoice when dates differ")
+}
+
+func (s *InvoiceTestSuite) TestCreateInvoice_DifferentReceiverNotDuplicate() {
+	receiverID1, err := s.setup.CreateTestReceiver("Receiver 1", true)
+	s.Require().NoError(err)
+	receiverID2, err := s.setup.CreateTestReceiver("Receiver 2", true)
+	s.Require().NoError(err)
+
+	startDate := time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC)
+
+	// Create first invoice with receiver 1
+	invoice1 := map[string]interface{}{
+		"title":              "March Invoice 1",
+		"receiver_id":        receiverID1,
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 100.00},
+		},
+	}
+
+	resp1, err := s.setup.MakeRequest("POST", "/api/invoices", invoice1)
+	s.Require().NoError(err)
+
+	result1, err := s.setup.ReadResponseBody(resp1)
+	s.Require().NoError(err)
+	firstInvoiceID := result1["id"]
+
+	// Create second invoice with different receiver (same amount, dates) - should NOT be duplicate
+	invoice2 := map[string]interface{}{
+		"title":              "March Invoice 2",
+		"receiver_id":        receiverID2,
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 100.00}, // Same amount
+		},
+	}
+
+	resp2, err := s.setup.MakeRequest("POST", "/api/invoices", invoice2)
+	s.Require().NoError(err)
+
+	result2, err := s.setup.ReadResponseBody(resp2)
+	s.Require().NoError(err)
+
+	// Should be a new invoice (different receiver)
+	s.NotEqual(firstInvoiceID, result2["id"], "Should create new invoice when receiver differs")
+}
+
+func (s *InvoiceTestSuite) TestCreateInvoice_NullDatesMatchNull() {
+	receiverID, err := s.setup.CreateTestReceiver("Test Receiver Null", true)
+	s.Require().NoError(err)
+
+	// Create first invoice with no dates
+	invoice1 := map[string]interface{}{
+		"title":       "Invoice Without Dates 1",
+		"receiver_id": receiverID,
+		// No invoice_started_at or invoice_ended_at
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 100.00},
+		},
+	}
+
+	resp1, err := s.setup.MakeRequest("POST", "/api/invoices", invoice1)
+	s.Require().NoError(err)
+
+	result1, err := s.setup.ReadResponseBody(resp1)
+	s.Require().NoError(err)
+	firstInvoiceID := result1["id"]
+
+	// Create second invoice with no dates (same amount, receiver) - should be duplicate
+	invoice2 := map[string]interface{}{
+		"title":       "Invoice Without Dates 2",
+		"receiver_id": receiverID,
+		// No invoice_started_at or invoice_ended_at
+		"items": []map[string]interface{}{
+			{"description": "Other Service", "quantity": 2, "unit_price": 50.00}, // Same total: 100
+		},
+	}
+
+	resp2, err := s.setup.MakeRequest("POST", "/api/invoices", invoice2)
+	s.Require().NoError(err)
+
+	result2, err := s.setup.ReadResponseBody(resp2)
+	s.Require().NoError(err)
+
+	// Should return the first invoice (null dates match null dates)
+	s.Equal(firstInvoiceID, result2["id"], "Invoices with null dates should be detected as duplicates")
+}
+
+func (s *InvoiceTestSuite) TestCreateInvoice_NullReceiverMatchNull() {
+	startDate := time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 4, 30, 0, 0, 0, 0, time.UTC)
+
+	// Create first invoice with no receiver
+	invoice1 := map[string]interface{}{
+		"title":              "Invoice Without Receiver 1",
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		// No receiver_id
+		"items": []map[string]interface{}{
+			{"description": "Service", "quantity": 1, "unit_price": 100.00},
+		},
+	}
+
+	resp1, err := s.setup.MakeRequest("POST", "/api/invoices", invoice1)
+	s.Require().NoError(err)
+
+	result1, err := s.setup.ReadResponseBody(resp1)
+	s.Require().NoError(err)
+	firstInvoiceID := result1["id"]
+
+	// Create second invoice with no receiver (same amount, dates) - should be duplicate
+	invoice2 := map[string]interface{}{
+		"title":              "Invoice Without Receiver 2",
+		"invoice_started_at": startDate.Format(time.RFC3339),
+		"invoice_ended_at":   endDate.Format(time.RFC3339),
+		// No receiver_id
+		"items": []map[string]interface{}{
+			{"description": "Other Service", "quantity": 2, "unit_price": 50.00}, // Same total: 100
+		},
+	}
+
+	resp2, err := s.setup.MakeRequest("POST", "/api/invoices", invoice2)
+	s.Require().NoError(err)
+
+	result2, err := s.setup.ReadResponseBody(resp2)
+	s.Require().NoError(err)
+
+	// Should return the first invoice (null receiver matches null receiver)
+	s.Equal(firstInvoiceID, result2["id"], "Invoices with null receiver should be detected as duplicates")
 }
 
 func TestInvoiceSuite(t *testing.T) {

@@ -84,11 +84,23 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 			DueDate:              dueDate,
 		}
 
-		if err := t.service.CreateInvoice(userID, invoice); err != nil {
+		createResult, err := t.service.CreateInvoice(userID, invoice)
+		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to create invoice: %v", err)), nil
 		}
 
-		// Set tags if provided
+		// If duplicate found, return existing invoice with message
+		if createResult.IsDuplicate {
+			response := map[string]interface{}{
+				"invoice":      createResult.Invoice,
+				"is_duplicate": true,
+				"message":      createResult.Message,
+			}
+			result, _ := json.Marshal(response)
+			return mcp.NewToolResultText(string(result)), nil
+		}
+
+		// Set tags if provided (only for newly created invoices)
 		if tagsRaw, ok := args["tags"].([]interface{}); ok && len(tagsRaw) > 0 {
 			var tagNames []string
 			for _, v := range tagsRaw {
@@ -97,14 +109,14 @@ func (t *CreateInvoiceTool) GetHandler() server.ToolHandlerFunc {
 				}
 			}
 			if len(tagNames) > 0 {
-				if err := t.service.SetInvoiceTags(userID, invoice.ID, tagNames); err != nil {
+				if err := t.service.SetInvoiceTags(userID, createResult.Invoice.ID, tagNames); err != nil {
 					// Log error but don't fail the entire operation
-					fmt.Printf("Warning: failed to set tags for invoice %d: %v\n", invoice.ID, err)
+					fmt.Printf("Warning: failed to set tags for invoice %d: %v\n", createResult.Invoice.ID, err)
 				}
 			}
 		}
 
-		created, _ := t.service.GetInvoiceByID(userID, invoice.ID)
+		created, _ := t.service.GetInvoiceByID(userID, createResult.Invoice.ID)
 		result, _ := json.Marshal(created)
 		return mcp.NewToolResultText(string(result)), nil
 	}

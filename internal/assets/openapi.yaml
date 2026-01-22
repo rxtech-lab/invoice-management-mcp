@@ -1414,6 +1414,11 @@ components:
         name:
           type: string
           description: Receiver name
+        other_names:
+          type: array
+          items:
+            type: string
+          description: Alternative names/aliases (populated from merged receivers)
         is_organization:
           type: boolean
           description: Whether the receiver is an organization
@@ -1444,6 +1449,11 @@ components:
         name:
           type: string
           description: Receiver name
+        other_names:
+          type: array
+          items:
+            type: string
+          description: Alternative names/aliases to update (cannot add new ones, only edit/remove)
         is_organization:
           type: boolean
           description: Whether the receiver is an organization

@@ -64,6 +64,7 @@ export interface Receiver {
   id: number;
   user_id: string;
   name: string;
+  other_names?: string[];
   is_organization: boolean;
   created_at: string;
   updated_at: string;
@@ -76,6 +77,7 @@ export interface CreateReceiverRequest {
 
 export interface UpdateReceiverRequest {
   name?: string;
+  other_names?: string[];
   is_organization?: boolean;
 }
 

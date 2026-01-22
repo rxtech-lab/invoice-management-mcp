@@ -28,7 +28,13 @@ export default async function InvoiceDetailPage({
   let tagsResponse;
 
   try {
-    [invoice, categoriesResponse, companiesResponse, receiversResponse, tagsResponse] = await Promise.all([
+    [
+      invoice,
+      categoriesResponse,
+      companiesResponse,
+      receiversResponse,
+      tagsResponse,
+    ] = await Promise.all([
       getInvoice(invoiceId),
       getCategories({ limit: 100 }),
       getCompanies({ limit: 100 }),

@@ -22,7 +22,7 @@ func NewCreateReceiverTool(service services.ReceiverService) *CreateReceiverTool
 
 func (t *CreateReceiverTool) GetTool() mcp.Tool {
 	return mcp.NewTool("create_receiver",
-		mcp.WithDescription("Create a new invoice receiver"),
+		mcp.WithDescription("Create a new invoice receiver. If a receiver with the same name (or alias) already exists, returns the existing receiver instead of creating a duplicate."),
 		mcp.WithString("name", mcp.Required(), mcp.Description("Receiver name")),
 		mcp.WithBoolean("is_organization", mcp.Description("Whether the receiver is an organization (default: false)")),
 	)
@@ -39,6 +39,19 @@ func (t *CreateReceiverTool) GetHandler() server.ToolHandlerFunc {
 		name, _ := args["name"].(string)
 		isOrganization, _ := args["is_organization"].(bool)
 
+		// Check for existing receiver with same name or alias
+		existingReceiver, err := t.service.FindByNameOrAlias(userID, name)
+		if err == nil && existingReceiver != nil {
+			// Found an existing receiver - return it instead of creating duplicate
+			result, _ := json.Marshal(map[string]interface{}{
+				"duplicate_found":    true,
+				"existing_receiver":  existingReceiver,
+				"message":            fmt.Sprintf("A receiver with name '%s' already exists (or is an alias of receiver '%s'). Use the existing receiver instead.", name, existingReceiver.Name),
+			})
+			return mcp.NewToolResultText(string(result)), nil
+		}
+
+		// No duplicate found, proceed with creation
 		receiver := &models.InvoiceReceiver{
 			Name:           name,
 			IsOrganization: isOrganization,
@@ -148,10 +161,11 @@ func NewUpdateReceiverTool(service services.ReceiverService) *UpdateReceiverTool
 
 func (t *UpdateReceiverTool) GetTool() mcp.Tool {
 	return mcp.NewTool("update_receiver",
-		mcp.WithDescription("Update an existing receiver"),
+		mcp.WithDescription("Update an existing receiver. Can modify name, organization status, and alternative names (aliases)."),
 		mcp.WithNumber("receiver_id", mcp.Required(), mcp.Description("Receiver ID")),
 		mcp.WithString("name", mcp.Description("Receiver name")),
 		mcp.WithBoolean("is_organization", mcp.Description("Whether the receiver is an organization")),
+		mcp.WithArray("other_names", mcp.Description("Alternative names/aliases for the receiver (from merged receivers)"), mcp.Items(map[string]any{"type": "string"})),
 	)
 }
 
@@ -168,16 +182,32 @@ func (t *UpdateReceiverTool) GetHandler() server.ToolHandlerFunc {
 			return mcp.NewToolResultError("receiver_id is required"), nil
 		}
 
-		name, _ := args["name"].(string)
-		isOrganization, _ := args["is_organization"].(bool)
-
-		receiver := &models.InvoiceReceiver{
-			ID:             receiverID,
-			Name:           name,
-			IsOrganization: isOrganization,
+		// Get existing receiver
+		existing, err := t.service.GetReceiverByID(userID, receiverID)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Receiver not found: %v", err)), nil
 		}
 
-		if err := t.service.UpdateReceiver(userID, receiver); err != nil {
+		// Update fields if provided
+		if name, ok := args["name"].(string); ok && name != "" {
+			existing.Name = name
+		}
+		if isOrganization, ok := args["is_organization"].(bool); ok {
+			existing.IsOrganization = isOrganization
+		}
+
+		// Handle other_names array
+		if otherNamesRaw, ok := args["other_names"].([]interface{}); ok {
+			var otherNames []string
+			for _, v := range otherNamesRaw {
+				if s, ok := v.(string); ok {
+					otherNames = append(otherNames, s)
+				}
+			}
+			existing.OtherNames = otherNames
+		}
+
+		if err := t.service.UpdateReceiver(userID, existing); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to update receiver: %v", err)), nil
 		}
 

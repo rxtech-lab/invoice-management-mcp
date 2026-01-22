@@ -13,7 +13,7 @@ import { createReceiverAction, updateReceiverAction } from "@/lib/actions/receiv
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, X, Edit2, Check } from "lucide-react";
 
 const receiverSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -31,6 +31,11 @@ export function ReceiverForm({ receiver }: ReceiverFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!receiver;
 
+  // State for managing other_names (aliases)
+  const [otherNames, setOtherNames] = useState<string[]>(receiver?.other_names || []);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+
   const {
     register,
     handleSubmit,
@@ -47,12 +52,37 @@ export function ReceiverForm({ receiver }: ReceiverFormProps) {
 
   const isOrganization = watch("is_organization");
 
+  const handleStartEdit = (index: number, currentValue: string) => {
+    setEditingIndex(index);
+    setEditValue(currentValue);
+  };
+
+  const handleSaveEdit = (index: number) => {
+    if (editValue.trim()) {
+      const newNames = [...otherNames];
+      newNames[index] = editValue.trim();
+      setOtherNames(newNames);
+    }
+    setEditingIndex(null);
+    setEditValue("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditValue("");
+  };
+
+  const handleRemoveName = (index: number) => {
+    setOtherNames(otherNames.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (data: ReceiverFormData) => {
     setIsSubmitting(true);
     try {
       const payload = {
         name: data.name,
         is_organization: data.is_organization || false,
+        ...(isEditing && { other_names: otherNames }),
       };
 
       const result = isEditing
@@ -98,6 +128,82 @@ export function ReceiverForm({ receiver }: ReceiverFormProps) {
               </p>
             </div>
           </div>
+
+          {/* Other Names Section - Only show when editing and has aliases */}
+          {isEditing && otherNames.length > 0 && (
+            <div className="space-y-3">
+              <div>
+                <Label>Alternative Names (Aliases)</Label>
+                <p className="text-sm text-muted-foreground">
+                  These are alternative names collected from merged receivers. You can edit or remove them.
+                </p>
+              </div>
+              <div className="space-y-2">
+                {otherNames.map((name, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    {editingIndex === index ? (
+                      <>
+                        <Input
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          className="flex-1"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSaveEdit(index);
+                            } else if (e.key === "Escape") {
+                              handleCancelEdit();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveEdit(index)}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex-1 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+                          {name}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStartEdit(index, name)}
+                          title="Edit alias"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveName(index)}
+                          title="Remove alias"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-4">
             <Button type="submit" disabled={isSubmitting}>
