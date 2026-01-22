@@ -137,7 +137,7 @@ func (s *tagService) DeleteTag(userID string, id uint) error {
 		}
 
 		// Delete all mappings for this tag
-		if err := tx.Where("tag_id = ?", id).Delete(&models.InvoiceTagMapping{}).Error; err != nil {
+		if err := tx.Where("invoice_tag_id = ?", id).Delete(&models.InvoiceTagMapping{}).Error; err != nil {
 			return err
 		}
 
@@ -174,7 +174,7 @@ func (s *tagService) AddTagToInvoice(userID string, invoiceID, tagID uint) error
 
 	// Check if mapping already exists
 	var existing models.InvoiceTagMapping
-	err := s.db.Where("invoice_id = ? AND tag_id = ?", invoiceID, tagID).First(&existing).Error
+	err := s.db.Where("invoice_id = ? AND invoice_tag_id = ?", invoiceID, tagID).First(&existing).Error
 	if err == nil {
 		// Mapping already exists, nothing to do
 		return nil
@@ -203,7 +203,7 @@ func (s *tagService) RemoveTagFromInvoice(userID string, invoiceID, tagID uint) 
 	}
 
 	// Delete the mapping
-	result := s.db.Where("invoice_id = ? AND tag_id = ?", invoiceID, tagID).Delete(&models.InvoiceTagMapping{})
+	result := s.db.Where("invoice_id = ? AND invoice_tag_id = ?", invoiceID, tagID).Delete(&models.InvoiceTagMapping{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -224,7 +224,7 @@ func (s *tagService) GetInvoicesByTagID(userID string, tagID uint, limit, offset
 	// Build query for invoices with this tag
 	query := s.db.Model(&models.Invoice{}).
 		Where("user_id = ?", userID).
-		Where("id IN (SELECT invoice_id FROM invoice_tag_mappings WHERE tag_id = ?)", tagID)
+		Where("id IN (SELECT invoice_id FROM invoice_tag_mappings WHERE invoice_tag_id = ?)", tagID)
 
 	// Get total count
 	if err := query.Count(&total).Error; err != nil {

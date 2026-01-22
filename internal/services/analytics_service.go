@@ -553,7 +553,7 @@ func (s *analyticsService) GetByTag(userID string, period AnalyticsPeriod) (*Ana
 			COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN invoices.amount ELSE 0 END), 0) as unpaid_amount
 		`).
 		Joins("INNER JOIN invoice_tag_mappings ON invoices.id = invoice_tag_mappings.invoice_id").
-		Joins("INNER JOIN invoice_tags ON invoice_tag_mappings.tag_id = invoice_tags.id").
+		Joins("INNER JOIN invoice_tags ON invoice_tag_mappings.invoice_tag_id = invoice_tags.id").
 		Where("invoices.user_id = ? AND COALESCE(invoices.due_date, invoices.created_at) >= ? AND COALESCE(invoices.due_date, invoices.created_at) <= ? AND invoices.deleted_at IS NULL",
 			userID, start, end).
 		Group("invoice_tags.id, invoice_tags.name, invoice_tags.color").
@@ -658,7 +658,7 @@ func (s *analyticsService) buildStatisticsQuery(userID string, start, end time.T
 		query = query.Where("(title LIKE ? OR description LIKE ?)", searchPattern, searchPattern)
 	}
 	if len(opts.TagIDs) > 0 {
-		query = query.Where("id IN (SELECT invoice_id FROM invoice_tag_mappings WHERE tag_id IN ?)", opts.TagIDs)
+		query = query.Where("id IN (SELECT invoice_id FROM invoice_tag_mappings WHERE invoice_tag_id IN ?)", opts.TagIDs)
 	}
 
 	return query

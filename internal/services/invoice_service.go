@@ -129,7 +129,7 @@ func (s *invoiceService) ListInvoices(userID string, opts InvoiceListOptions) ([
 
 	// Filter by tag IDs using subquery
 	if len(opts.TagIDs) > 0 {
-		query = query.Where("id IN (SELECT invoice_id FROM invoice_tag_mappings WHERE tag_id IN ?)", opts.TagIDs)
+		query = query.Where("id IN (SELECT invoice_id FROM invoice_tag_mappings WHERE invoice_tag_id IN ?)", opts.TagIDs)
 	}
 
 	// Get total count

@@ -115,25 +115,12 @@ func (s *dbService) migrate() error {
 		&models.InvoiceCompany{},
 		&models.InvoiceReceiver{},
 		&models.InvoiceTag{},
+		&models.InvoiceTagMapping{},
 		&models.Invoice{},
 		&models.InvoiceItem{},
 		&models.FileUpload{},
 	); err != nil {
 		return err
-	}
-
-	// Explicitly create invoice_tag_mappings table if it doesn't exist
-	// AutoMigrate may not properly handle join tables on some databases
-	if err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS invoice_tag_mappings (
-			invoice_id INTEGER NOT NULL,
-			tag_id INTEGER NOT NULL,
-			PRIMARY KEY (invoice_id, tag_id),
-			FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
-			FOREIGN KEY (tag_id) REFERENCES invoice_tags(id) ON DELETE CASCADE
-		)
-	`).Error; err != nil {
-		return fmt.Errorf("failed to create invoice_tag_mappings table: %w", err)
 	}
 
 	// Migrate legacy tags from JSON array to many-to-many relationship
@@ -238,7 +225,7 @@ func (s *dbService) migrateLegacyTags() error {
 
 				// Create mapping if it doesn't exist
 				var existingMapping models.InvoiceTagMapping
-				err := tx.Where("invoice_id = ? AND tag_id = ?", inv.ID, tagID).First(&existingMapping).Error
+				err := tx.Where("invoice_id = ? AND invoice_tag_id = ?", inv.ID, tagID).First(&existingMapping).Error
 				if err != nil {
 					mapping := models.InvoiceTagMapping{
 						InvoiceID: inv.ID,

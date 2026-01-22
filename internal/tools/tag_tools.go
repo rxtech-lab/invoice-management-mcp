@@ -380,7 +380,7 @@ func (t *MergeReceiversTool) GetTool() mcp.Tool {
 	return mcp.NewTool("merge_receivers",
 		mcp.WithDescription("Merge multiple receivers into one. All invoices from source receivers will be moved to the target receiver."),
 		mcp.WithNumber("target_id", mcp.Required(), mcp.Description("ID of the receiver to keep")),
-		mcp.WithArray("source_ids", mcp.Required(), mcp.Description("IDs of receivers to merge into target (will be deleted)")),
+		mcp.WithArray("source_ids", mcp.Required(), mcp.Description("IDs of receivers to merge into target (will be deleted)"), mcp.Items(map[string]any{"type": "number"})),
 	)
 }
 

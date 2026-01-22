@@ -25,7 +25,7 @@ func (InvoiceTag) TableName() string {
 // InvoiceTagMapping is the join table for many-to-many relationship between Invoice and InvoiceTag
 type InvoiceTagMapping struct {
 	InvoiceID uint `gorm:"primaryKey" json:"invoice_id"`
-	TagID     uint `gorm:"primaryKey" json:"tag_id"`
+	TagID     uint `gorm:"primaryKey;column:invoice_tag_id" json:"invoice_tag_id"`
 }
 
 // TableName returns the table name for InvoiceTagMapping
