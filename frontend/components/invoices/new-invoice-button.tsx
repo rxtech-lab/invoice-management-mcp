@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createInvoiceWithAgentAction, type ToolProgress } from "@/lib/actions/invoice-actions";
-import { uploadFileAction } from "@/lib/actions/upload-actions";
+import { getPresignedURLAction, confirmUploadAction } from "@/lib/actions/upload-actions";
 import { useRouter } from "next/navigation";
 
 type LoadingState = "idle" | "uploading" | "processing";
@@ -48,13 +48,42 @@ export function NewInvoiceButton() {
     const toastId = toast.loading("Uploading invoice...");
 
     try {
-      // Upload file
-      const formData = new FormData();
-      formData.append("file", file);
-      const uploadResult = await uploadFileAction(formData);
+      // Get presigned URL for upload
+      const contentType = file.type || "application/pdf";
+      const presignedResult = await getPresignedURLAction(file.name, contentType);
 
-      if (!uploadResult.success || !uploadResult.data) {
-        toast.error(uploadResult.error || "Failed to upload file", {
+      if (!presignedResult.success || !presignedResult.data) {
+        toast.error(presignedResult.error || "Failed to get upload URL", {
+          id: toastId,
+        });
+        return;
+      }
+
+      // Upload directly to S3 using presigned URL
+      const { upload_url, key } = presignedResult.data;
+      const uploadResponse = await fetch(upload_url, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        toast.error(`Upload failed: ${uploadResponse.status}`, {
+          id: toastId,
+        });
+        return;
+      }
+
+      // Confirm upload to register file in database
+      const confirmResult = await confirmUploadAction({
+        key,
+        filename: file.name,
+        content_type: contentType,
+        size: file.size,
+      });
+
+      if (!confirmResult.success) {
+        toast.error(confirmResult.error || "Failed to confirm upload", {
           id: toastId,
         });
         return;
@@ -64,9 +93,7 @@ export function NewInvoiceButton() {
       setLoadingState("processing");
       toast.loading("Processing invoice with AI agent...", { id: toastId });
 
-      const { progress } = await createInvoiceWithAgentAction(
-        uploadResult.data.key
-      );
+      const { progress } = await createInvoiceWithAgentAction(key);
 
       let lastStatus: ToolProgress["status"] = "idle";
 

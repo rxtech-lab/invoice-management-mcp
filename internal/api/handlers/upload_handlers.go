@@ -101,6 +101,63 @@ func (h *StrictHandlers) GetPresignedURL(
 	}, nil
 }
 
+// ConfirmPresignedUpload implements generated.StrictServerInterface
+func (h *StrictHandlers) ConfirmPresignedUpload(
+	ctx context.Context,
+	request generated.ConfirmPresignedUploadRequestObject,
+) (generated.ConfirmPresignedUploadResponseObject, error) {
+	userID, err := getUserID(ctx)
+	if err != nil {
+		return generated.ConfirmPresignedUpload401JSONResponse{UnauthorizedJSONResponse: unauthorized()}, nil
+	}
+
+	if request.Body == nil {
+		return generated.ConfirmPresignedUpload400JSONResponse{BadRequestJSONResponse: badRequest("Request body is required")}, nil
+	}
+
+	key := request.Body.Key
+	filename := request.Body.Filename
+	contentType := request.Body.ContentType
+	size := request.Body.Size
+
+	// Check if file already registered
+	existingFile, _ := h.fileUploadService.GetFileUploadByKey(key)
+	if existingFile != nil {
+		// File already registered - return success with existing data
+		downloadURL, err := h.uploadService.GetPresignedDownloadURL(ctx, key)
+		if err != nil {
+			return generated.ConfirmPresignedUpload400JSONResponse{BadRequestJSONResponse: badRequest("Failed to generate download URL")}, nil
+		}
+		return generated.ConfirmPresignedUpload201JSONResponse{
+			Key:         key,
+			DownloadUrl: downloadURL,
+			Filename:    existingFile.Filename,
+			Size:        int(existingFile.Size),
+			ContentType: existingFile.ContentType,
+		}, nil
+	}
+
+	// Save file metadata to database for ownership tracking
+	_, err = h.fileUploadService.CreateFileUpload(userID, key, filename, contentType, size)
+	if err != nil {
+		return generated.ConfirmPresignedUpload400JSONResponse{BadRequestJSONResponse: badRequest("Failed to save file metadata")}, nil
+	}
+
+	// Generate presigned download URL
+	downloadURL, err := h.uploadService.GetPresignedDownloadURL(ctx, key)
+	if err != nil {
+		return generated.ConfirmPresignedUpload400JSONResponse{BadRequestJSONResponse: badRequest("Failed to generate download URL")}, nil
+	}
+
+	return generated.ConfirmPresignedUpload201JSONResponse{
+		Key:         key,
+		DownloadUrl: downloadURL,
+		Filename:    filename,
+		Size:        int(size),
+		ContentType: contentType,
+	}, nil
+}
+
 // GetFileDownloadURL implements generated.StrictServerInterface
 func (h *StrictHandlers) GetFileDownloadURL(
 	ctx context.Context,

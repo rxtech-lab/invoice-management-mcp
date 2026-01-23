@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, FileText, Download, X, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { uploadFileAction, getFileDownloadURLAction } from "@/lib/actions/upload-actions";
+import { getPresignedURLAction, getFileDownloadURLAction, confirmUploadAction } from "@/lib/actions/upload-actions";
 
 interface FileUploadProps {
   value?: string | null;
@@ -75,23 +75,56 @@ export function FileUpload({
         return;
       }
 
-      // Proceed with upload
+      // Proceed with upload using presigned URL
       setState("uploading");
       setFilename(file.name);
       setErrorMessage(null);
 
-      const formData = new FormData();
-      formData.append("file", file);
+      // Get presigned URL from backend
+      const contentType = file.type || "application/octet-stream";
+      const presignedResult = await getPresignedURLAction(file.name, contentType);
 
-      const result = await uploadFileAction(formData);
-
-      if (result.success && result.data) {
-        setState("uploaded");
-        setFilename(result.data.filename || file.name);
-        onChange(result.data.key);
-      } else {
+      if (!presignedResult.success || !presignedResult.data) {
         setState("error");
-        setErrorMessage(result.error || "Upload failed");
+        setErrorMessage(presignedResult.error || "Failed to get upload URL");
+        return;
+      }
+
+      // Upload directly to S3 using presigned URL
+      const { upload_url, key } = presignedResult.data;
+      try {
+        const uploadResponse = await fetch(upload_url, {
+          method: "PUT",
+          headers: { "Content-Type": contentType },
+          body: file,
+        });
+
+        if (!uploadResponse.ok) {
+          setState("error");
+          setErrorMessage(`Upload failed: ${uploadResponse.status}`);
+          return;
+        }
+
+        // Confirm upload to register file in database
+        const confirmResult = await confirmUploadAction({
+          key,
+          filename: file.name,
+          content_type: contentType,
+          size: file.size,
+        });
+
+        if (!confirmResult.success) {
+          setState("error");
+          setErrorMessage(confirmResult.error || "Failed to confirm upload");
+          return;
+        }
+
+        setState("uploaded");
+        setFilename(file.name);
+        onChange(key);
+      } catch {
+        setState("error");
+        setErrorMessage("Upload failed: Network error");
       }
     },
     [accept, maxSizeMB, onChange]

@@ -229,6 +229,13 @@ export interface PresignedURLResponse {
   content_type: string;
 }
 
+export interface ConfirmUploadRequest {
+  key: string;
+  filename: string;
+  content_type: string;
+  size: number;
+}
+
 export interface FileDownloadURLResponse {
   download_url: string;
   key: string;
