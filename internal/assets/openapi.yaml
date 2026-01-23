@@ -922,6 +922,31 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/upload/confirm:
+    post:
+      tags:
+        - Upload
+      summary: Confirm presigned upload
+      description: Registers a file that was uploaded via presigned URL in the database for ownership tracking
+      operationId: confirmPresignedUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmUploadRequest'
+      responses:
+        '201':
+          description: Upload confirmed and registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/upload/html-to-pdf:
     post:
       tags:
@@ -1935,6 +1960,28 @@ components:
         content_type:
           type: string
           description: MIME type
+
+    ConfirmUploadRequest:
+      type: object
+      required:
+        - key
+        - filename
+        - content_type
+        - size
+      properties:
+        key:
+          type: string
+          description: S3 object key returned from presigned URL endpoint
+        filename:
+          type: string
+          description: Original filename
+        content_type:
+          type: string
+          description: MIME type of the file
+        size:
+          type: integer
+          format: int64
+          description: File size in bytes
 
     FileDownloadURLResponse:
       type: object

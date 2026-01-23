@@ -133,6 +133,9 @@ type ServerInterface interface {
 	// Upload file
 	// (POST /api/upload)
 	UploadFile(c *fiber.Ctx) error
+	// Confirm presigned upload
+	// (POST /api/upload/confirm)
+	ConfirmPresignedUpload(c *fiber.Ctx) error
 	// Convert HTML to PDF and upload
 	// (POST /api/upload/html-to-pdf)
 	UploadHtmlToPdf(c *fiber.Ctx) error
@@ -1084,6 +1087,16 @@ func (siw *ServerInterfaceWrapper) UploadFile(c *fiber.Ctx) error {
 	return siw.Handler.UploadFile(c)
 }
 
+// ConfirmPresignedUpload operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmPresignedUpload(c *fiber.Ctx) error {
+
+	c.Context().SetUserValue(BearerAuthScopes, []string{})
+
+	c.Context().SetUserValue(OAuth2Scopes, []string{"read:invoices", "write:invoices", "read:categories", "write:categories", "read:companies", "write:companies", "read:receivers", "write:receivers"})
+
+	return siw.Handler.ConfirmPresignedUpload(c)
+}
+
 // UploadHtmlToPdf operation middleware
 func (siw *ServerInterfaceWrapper) UploadHtmlToPdf(c *fiber.Ctx) error {
 
@@ -1241,6 +1254,8 @@ func RegisterHandlersWithOptions(router fiber.Router, si ServerInterface, option
 	router.Put(options.BaseURL+"/api/tags/:id", wrapper.UpdateTag)
 
 	router.Post(options.BaseURL+"/api/upload", wrapper.UploadFile)
+
+	router.Post(options.BaseURL+"/api/upload/confirm", wrapper.ConfirmPresignedUpload)
 
 	router.Post(options.BaseURL+"/api/upload/html-to-pdf", wrapper.UploadHtmlToPdf)
 
@@ -2555,6 +2570,41 @@ func (response UploadFile401JSONResponse) VisitUploadFileResponse(ctx *fiber.Ctx
 	return ctx.JSON(&response)
 }
 
+type ConfirmPresignedUploadRequestObject struct {
+	Body *ConfirmPresignedUploadJSONRequestBody
+}
+
+type ConfirmPresignedUploadResponseObject interface {
+	VisitConfirmPresignedUploadResponse(ctx *fiber.Ctx) error
+}
+
+type ConfirmPresignedUpload201JSONResponse UploadResponse
+
+func (response ConfirmPresignedUpload201JSONResponse) VisitConfirmPresignedUploadResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(201)
+
+	return ctx.JSON(&response)
+}
+
+type ConfirmPresignedUpload400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ConfirmPresignedUpload400JSONResponse) VisitConfirmPresignedUploadResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type ConfirmPresignedUpload401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ConfirmPresignedUpload401JSONResponse) VisitConfirmPresignedUploadResponse(ctx *fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(401)
+
+	return ctx.JSON(&response)
+}
+
 type UploadHtmlToPdfRequestObject struct {
 	Body *UploadHtmlToPdfJSONRequestBody
 }
@@ -2771,6 +2821,9 @@ type StrictServerInterface interface {
 	// Upload file
 	// (POST /api/upload)
 	UploadFile(ctx context.Context, request UploadFileRequestObject) (UploadFileResponseObject, error)
+	// Confirm presigned upload
+	// (POST /api/upload/confirm)
+	ConfirmPresignedUpload(ctx context.Context, request ConfirmPresignedUploadRequestObject) (ConfirmPresignedUploadResponseObject, error)
 	// Convert HTML to PDF and upload
 	// (POST /api/upload/html-to-pdf)
 	UploadHtmlToPdf(ctx context.Context, request UploadHtmlToPdfRequestObject) (UploadHtmlToPdfResponseObject, error)
@@ -3921,6 +3974,37 @@ func (sh *strictHandler) UploadFile(ctx *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	} else if validResponse, ok := response.(UploadFileResponseObject); ok {
 		if err := validResponse.VisitUploadFileResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ConfirmPresignedUpload operation middleware
+func (sh *strictHandler) ConfirmPresignedUpload(ctx *fiber.Ctx) error {
+	var request ConfirmPresignedUploadRequestObject
+
+	var body ConfirmPresignedUploadJSONRequestBody
+	if err := ctx.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	request.Body = &body
+
+	handler := func(ctx *fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmPresignedUpload(ctx.UserContext(), request.(ConfirmPresignedUploadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmPresignedUpload")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(ConfirmPresignedUploadResponseObject); ok {
+		if err := validResponse.VisitConfirmPresignedUploadResponse(ctx); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 	} else if response != nil {

@@ -236,6 +236,11 @@ type ClientInterface interface {
 	// UploadFileWithBody request with any body
 	UploadFileWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ConfirmPresignedUploadWithBody request with any body
+	ConfirmPresignedUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ConfirmPresignedUpload(ctx context.Context, body ConfirmPresignedUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadHtmlToPdfWithBody request with any body
 	UploadHtmlToPdfWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -886,6 +891,30 @@ func (c *Client) UpdateTag(ctx context.Context, id TagId, body UpdateTagJSONRequ
 
 func (c *Client) UploadFileWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadFileRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ConfirmPresignedUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewConfirmPresignedUploadRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ConfirmPresignedUpload(ctx context.Context, body ConfirmPresignedUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewConfirmPresignedUploadRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2861,6 +2890,46 @@ func NewUploadFileRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
+// NewConfirmPresignedUploadRequest calls the generic ConfirmPresignedUpload builder with application/json body
+func NewConfirmPresignedUploadRequest(server string, body ConfirmPresignedUploadJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewConfirmPresignedUploadRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewConfirmPresignedUploadRequestWithBody generates requests for ConfirmPresignedUpload with any type of body
+func NewConfirmPresignedUploadRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/upload/confirm")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUploadHtmlToPdfRequest calls the generic UploadHtmlToPdf builder with application/json body
 func NewUploadHtmlToPdfRequest(server string, body UploadHtmlToPdfJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -3178,6 +3247,11 @@ type ClientWithResponsesInterface interface {
 
 	// UploadFileWithBodyWithResponse request with any body
 	UploadFileWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadFileResponse, error)
+
+	// ConfirmPresignedUploadWithBodyWithResponse request with any body
+	ConfirmPresignedUploadWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfirmPresignedUploadResponse, error)
+
+	ConfirmPresignedUploadWithResponse(ctx context.Context, body ConfirmPresignedUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfirmPresignedUploadResponse, error)
 
 	// UploadHtmlToPdfWithBodyWithResponse request with any body
 	UploadHtmlToPdfWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadHtmlToPdfResponse, error)
@@ -4113,6 +4187,30 @@ func (r UploadFileResponse) StatusCode() int {
 	return 0
 }
 
+type ConfirmPresignedUploadResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *UploadResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+}
+
+// Status returns HTTPResponse.Status
+func (r ConfirmPresignedUploadResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ConfirmPresignedUploadResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadHtmlToPdfResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4655,6 +4753,23 @@ func (c *ClientWithResponses) UploadFileWithBodyWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseUploadFileResponse(rsp)
+}
+
+// ConfirmPresignedUploadWithBodyWithResponse request with arbitrary body returning *ConfirmPresignedUploadResponse
+func (c *ClientWithResponses) ConfirmPresignedUploadWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfirmPresignedUploadResponse, error) {
+	rsp, err := c.ConfirmPresignedUploadWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfirmPresignedUploadResponse(rsp)
+}
+
+func (c *ClientWithResponses) ConfirmPresignedUploadWithResponse(ctx context.Context, body ConfirmPresignedUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfirmPresignedUploadResponse, error) {
+	rsp, err := c.ConfirmPresignedUpload(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfirmPresignedUploadResponse(rsp)
 }
 
 // UploadHtmlToPdfWithBodyWithResponse request with arbitrary body returning *UploadHtmlToPdfResponse
@@ -6123,6 +6238,46 @@ func ParseUploadFileResponse(rsp *http.Response) (*UploadFileResponse, error) {
 	}
 
 	response := &UploadFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UploadResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseConfirmPresignedUploadResponse parses an HTTP response from a ConfirmPresignedUploadWithResponse call
+func ParseConfirmPresignedUploadResponse(rsp *http.Response) (*ConfirmPresignedUploadResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ConfirmPresignedUploadResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

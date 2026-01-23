@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import type { UploadResponse, PresignedURLResponse, FileDownloadURLResponse } from "@/lib/api/types";
+import type { UploadResponse, PresignedURLResponse, FileDownloadURLResponse, ConfirmUploadRequest } from "@/lib/api/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -104,6 +104,40 @@ export async function getFileDownloadURLAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to get download URL",
+    };
+  }
+}
+
+export async function confirmUploadAction(
+  data: ConfirmUploadRequest
+): Promise<{ success: boolean; data?: UploadResponse; error?: string }> {
+  try {
+    const session = await auth();
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/upload/confirm`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `Failed to confirm upload: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to confirm upload",
     };
   }
 }
