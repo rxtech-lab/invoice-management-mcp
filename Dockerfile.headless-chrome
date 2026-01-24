@@ -1,0 +1,13 @@
+FROM chromedp/headless-shell:latest
+
+# Install Chinese fonts (Noto Sans CJK covers Chinese, Japanese, Korean)
+USER root
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    fonts-noto-cjk \
+    fontconfig && \
+    rm -rf /var/lib/apt/lists/* && \
+    fc-cache -fv
+
+# Switch back to non-root user (chromedp uses uid 1001)
+USER 1001
