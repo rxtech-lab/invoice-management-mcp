@@ -75,7 +75,7 @@ spec:
               drop:
                 - ALL
         - name: headless-chrome
-          image: chromedp/headless-shell:latest
+          image: ghcr.io/rxtech-lab/headless-chrome-cjk:latest
           ports:
             - containerPort: 9222
               protocol: TCP

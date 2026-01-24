@@ -83,8 +83,7 @@ func (s *pdfService) ConvertHTMLToPDF(ctx context.Context, html string, options 
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
-body { font-family: 'Noto Sans SC', Arial, sans-serif; }
+body { font-family: 'Noto Sans CJK SC', Arial, sans-serif; }
 </style>
 </head>
 <body>
