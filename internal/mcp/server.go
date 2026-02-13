@@ -134,29 +134,8 @@ func (s *MCPServer) initializeTools(
 	srv.AddTool(advancedSearchTool.GetTool(), advancedSearchTool.GetHandler())
 
 	// Tag Tools
-	createTagTool := tools.NewCreateTagTool(tagService)
-	srv.AddTool(createTagTool.GetTool(), createTagTool.GetHandler())
-
-	listTagsTool := tools.NewListTagsTool(tagService)
-	srv.AddTool(listTagsTool.GetTool(), listTagsTool.GetHandler())
-
-	getTagTool := tools.NewGetTagTool(tagService)
-	srv.AddTool(getTagTool.GetTool(), getTagTool.GetHandler())
-
-	updateTagTool := tools.NewUpdateTagTool(tagService)
-	srv.AddTool(updateTagTool.GetTool(), updateTagTool.GetHandler())
-
-	deleteTagTool := tools.NewDeleteTagTool(tagService)
-	srv.AddTool(deleteTagTool.GetTool(), deleteTagTool.GetHandler())
-
-	addTagToInvoiceTool := tools.NewAddTagToInvoiceTool(tagService)
-	srv.AddTool(addTagToInvoiceTool.GetTool(), addTagToInvoiceTool.GetHandler())
-
-	removeTagFromInvoiceTool := tools.NewRemoveTagFromInvoiceTool(tagService)
-	srv.AddTool(removeTagFromInvoiceTool.GetTool(), removeTagFromInvoiceTool.GetHandler())
-
-	searchInvoicesByTagsTool := tools.NewSearchInvoicesByTagsTool(tagService)
-	srv.AddTool(searchInvoicesByTagsTool.GetTool(), searchInvoicesByTagsTool.GetHandler())
+	manageTagTool := tools.NewManageTagTool(tagService)
+	srv.AddTool(manageTagTool.GetTool(), manageTagTool.GetHandler())
 
 	s.server = srv
 }
