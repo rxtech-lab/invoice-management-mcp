@@ -83,20 +83,8 @@ func (s *MCPServer) initializeTools(
 	srv.AddTool(manageCategoryTool.GetTool(), manageCategoryTool.GetHandler())
 
 	// Company Tools
-	createCompanyTool := tools.NewCreateCompanyTool(companyService)
-	srv.AddTool(createCompanyTool.GetTool(), createCompanyTool.GetHandler())
-
-	listCompaniesTool := tools.NewListCompaniesTool(companyService)
-	srv.AddTool(listCompaniesTool.GetTool(), listCompaniesTool.GetHandler())
-
-	getCompanyTool := tools.NewGetCompanyTool(companyService)
-	srv.AddTool(getCompanyTool.GetTool(), getCompanyTool.GetHandler())
-
-	updateCompanyTool := tools.NewUpdateCompanyTool(companyService)
-	srv.AddTool(updateCompanyTool.GetTool(), updateCompanyTool.GetHandler())
-
-	deleteCompanyTool := tools.NewDeleteCompanyTool(companyService)
-	srv.AddTool(deleteCompanyTool.GetTool(), deleteCompanyTool.GetHandler())
+	manageCompanyTool := tools.NewManageCompanyTool(companyService)
+	srv.AddTool(manageCompanyTool.GetTool(), manageCompanyTool.GetHandler())
 
 	// Receiver Tools
 	createReceiverTool := tools.NewCreateReceiverTool(receiverService)
