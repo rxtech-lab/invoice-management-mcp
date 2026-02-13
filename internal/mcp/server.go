@@ -91,26 +91,8 @@ func (s *MCPServer) initializeTools(
 	srv.AddTool(manageReceiverTool.GetTool(), manageReceiverTool.GetHandler())
 
 	// Invoice Tools
-	createInvoiceTool := tools.NewCreateInvoiceTool(invoiceService)
-	srv.AddTool(createInvoiceTool.GetTool(), createInvoiceTool.GetHandler())
-
-	listInvoicesTool := tools.NewListInvoicesTool(invoiceService)
-	srv.AddTool(listInvoicesTool.GetTool(), listInvoicesTool.GetHandler())
-
-	getInvoiceTool := tools.NewGetInvoiceTool(invoiceService)
-	srv.AddTool(getInvoiceTool.GetTool(), getInvoiceTool.GetHandler())
-
-	updateInvoiceTool := tools.NewUpdateInvoiceTool(invoiceService)
-	srv.AddTool(updateInvoiceTool.GetTool(), updateInvoiceTool.GetHandler())
-
-	deleteInvoiceTool := tools.NewDeleteInvoiceTool(invoiceService)
-	srv.AddTool(deleteInvoiceTool.GetTool(), deleteInvoiceTool.GetHandler())
-
-	searchInvoicesTool := tools.NewSearchInvoicesTool(invoiceService)
-	srv.AddTool(searchInvoicesTool.GetTool(), searchInvoicesTool.GetHandler())
-
-	updateInvoiceStatusTool := tools.NewUpdateInvoiceStatusTool(invoiceService)
-	srv.AddTool(updateInvoiceStatusTool.GetTool(), updateInvoiceStatusTool.GetHandler())
+	manageInvoiceTool := tools.NewManageInvoiceTool(invoiceService)
+	srv.AddTool(manageInvoiceTool.GetTool(), manageInvoiceTool.GetHandler())
 
 	// Invoice Item Tools
 	addInvoiceItemTool := tools.NewAddInvoiceItemTool(invoiceService)
