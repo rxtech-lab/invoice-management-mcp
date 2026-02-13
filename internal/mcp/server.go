@@ -79,20 +79,8 @@ func (s *MCPServer) initializeTools(
 	})
 
 	// Category Tools
-	createCategoryTool := tools.NewCreateCategoryTool(categoryService)
-	srv.AddTool(createCategoryTool.GetTool(), createCategoryTool.GetHandler())
-
-	listCategoriesResult := tools.NewListCategoriesTool(categoryService)
-	srv.AddTool(listCategoriesResult.GetTool(), listCategoriesResult.GetHandler())
-
-	getCategoryTool := tools.NewGetCategoryTool(categoryService)
-	srv.AddTool(getCategoryTool.GetTool(), getCategoryTool.GetHandler())
-
-	updateCategoryTool := tools.NewUpdateCategoryTool(categoryService)
-	srv.AddTool(updateCategoryTool.GetTool(), updateCategoryTool.GetHandler())
-
-	deleteCategoryTool := tools.NewDeleteCategoryTool(categoryService)
-	srv.AddTool(deleteCategoryTool.GetTool(), deleteCategoryTool.GetHandler())
+	manageCategoryTool := tools.NewManageCategoryTool(categoryService)
+	srv.AddTool(manageCategoryTool.GetTool(), manageCategoryTool.GetHandler())
 
 	// Company Tools
 	createCompanyTool := tools.NewCreateCompanyTool(companyService)
