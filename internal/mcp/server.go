@@ -95,14 +95,8 @@ func (s *MCPServer) initializeTools(
 	srv.AddTool(manageInvoiceTool.GetTool(), manageInvoiceTool.GetHandler())
 
 	// Invoice Item Tools
-	addInvoiceItemTool := tools.NewAddInvoiceItemTool(invoiceService)
-	srv.AddTool(addInvoiceItemTool.GetTool(), addInvoiceItemTool.GetHandler())
-
-	updateInvoiceItemTool := tools.NewUpdateInvoiceItemTool(invoiceService)
-	srv.AddTool(updateInvoiceItemTool.GetTool(), updateInvoiceItemTool.GetHandler())
-
-	deleteInvoiceItemTool := tools.NewDeleteInvoiceItemTool(invoiceService)
-	srv.AddTool(deleteInvoiceItemTool.GetTool(), deleteInvoiceItemTool.GetHandler())
+	manageInvoiceItemTool := tools.NewManageInvoiceItemTool(invoiceService)
+	srv.AddTool(manageInvoiceItemTool.GetTool(), manageInvoiceItemTool.GetHandler())
 
 	// Upload Tools
 	getPresignedURLTool := tools.NewGetPresignedURLTool(uploadService)
