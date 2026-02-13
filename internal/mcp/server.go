@@ -87,20 +87,8 @@ func (s *MCPServer) initializeTools(
 	srv.AddTool(manageCompanyTool.GetTool(), manageCompanyTool.GetHandler())
 
 	// Receiver Tools
-	createReceiverTool := tools.NewCreateReceiverTool(receiverService)
-	srv.AddTool(createReceiverTool.GetTool(), createReceiverTool.GetHandler())
-
-	listReceiversTool := tools.NewListReceiversTool(receiverService)
-	srv.AddTool(listReceiversTool.GetTool(), listReceiversTool.GetHandler())
-
-	getReceiverTool := tools.NewGetReceiverTool(receiverService)
-	srv.AddTool(getReceiverTool.GetTool(), getReceiverTool.GetHandler())
-
-	updateReceiverTool := tools.NewUpdateReceiverTool(receiverService)
-	srv.AddTool(updateReceiverTool.GetTool(), updateReceiverTool.GetHandler())
-
-	deleteReceiverTool := tools.NewDeleteReceiverTool(receiverService)
-	srv.AddTool(deleteReceiverTool.GetTool(), deleteReceiverTool.GetHandler())
+	manageReceiverTool := tools.NewManageReceiverTool(receiverService)
+	srv.AddTool(manageReceiverTool.GetTool(), manageReceiverTool.GetHandler())
 
 	// Invoice Tools
 	createInvoiceTool := tools.NewCreateInvoiceTool(invoiceService)
@@ -169,10 +157,6 @@ func (s *MCPServer) initializeTools(
 
 	searchInvoicesByTagsTool := tools.NewSearchInvoicesByTagsTool(tagService)
 	srv.AddTool(searchInvoicesByTagsTool.GetTool(), searchInvoicesByTagsTool.GetHandler())
-
-	// Merge Receivers Tool
-	mergeReceiversTool := tools.NewMergeReceiversTool(receiverService)
-	srv.AddTool(mergeReceiversTool.GetTool(), mergeReceiversTool.GetHandler())
 
 	s.server = srv
 }
