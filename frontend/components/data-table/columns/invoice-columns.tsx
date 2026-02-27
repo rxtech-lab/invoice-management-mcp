@@ -192,6 +192,7 @@ export const invoiceColumns: ColumnDef<Invoice>[] = [
     header: "Status",
     cell: ({ row }) => {
       const status = row.original.status;
+      if (!status) return "-";
       return (
         <Link href={`/invoices?status=${status}`}>
           <Badge variant={statusVariants[status]} className="cursor-pointer">
