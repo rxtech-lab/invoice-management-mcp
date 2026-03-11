@@ -9,6 +9,8 @@ import { NewInvoiceButton } from "@/components/invoices/new-invoice-button";
 import { InvoiceFilters } from "@/components/invoices/invoice-filters";
 import type { InvoiceStatus } from "@/lib/api/types";
 
+const DEFAULT_PAGE_SIZE = 10;
+
 interface Props {
   searchParams: Promise<{
     keyword?: string;
@@ -17,11 +19,18 @@ interface Props {
     receiver_id?: string;
     tag_ids?: string;
     status?: string;
+    page?: string;
+    page_size?: string;
   }>;
 }
 
 export default async function InvoicesPage({ searchParams }: Props) {
   const params = await searchParams;
+
+  // Parse pagination params
+  const page = Math.max(1, parseInt(params.page || "1", 10) || 1);
+  const pageSize = Math.max(1, parseInt(params.page_size || String(DEFAULT_PAGE_SIZE), 10) || DEFAULT_PAGE_SIZE);
+  const offset = (page - 1) * pageSize;
 
   // Parse tag_ids from comma-separated string to number array
   const tagIds = params.tag_ids
@@ -42,7 +51,8 @@ export default async function InvoicesPage({ searchParams }: Props) {
           : undefined,
         tag_ids: tagIds,
         status: params.status as InvoiceStatus | undefined,
-        limit: 100,
+        limit: pageSize,
+        offset,
       }),
       getCategories({ limit: 100 }),
       getCompanies({ limit: 100 }),
@@ -73,7 +83,16 @@ export default async function InvoicesPage({ searchParams }: Props) {
         receivers={receivers}
         tags={tags}
       />
-      <DataTable columns={invoiceColumns} data={invoices} />
+      <DataTable
+        columns={invoiceColumns}
+        data={invoices}
+        serverPagination={{
+          total: invoicesRes.total ?? 0,
+          currentPage: page,
+          pageSize,
+          basePath: "/invoices",
+        }}
+      />
     </div>
   );
 }
