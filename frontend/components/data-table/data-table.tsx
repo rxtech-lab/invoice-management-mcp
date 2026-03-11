@@ -59,7 +59,7 @@ export function DataTable<TData, TValue>({
 
   const isServerPaginated = !!serverPagination;
   const serverPageCount = serverPagination
-    ? Math.max(1, Math.ceil(serverPagination.total / serverPagination.pageSize))
+    ? Math.max(1, Math.ceil(serverPagination.total / Math.max(1, serverPagination.pageSize)))
     : undefined;
 
   const table = useReactTable({
