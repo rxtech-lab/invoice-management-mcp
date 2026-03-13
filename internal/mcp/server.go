@@ -79,84 +79,24 @@ func (s *MCPServer) initializeTools(
 	})
 
 	// Category Tools
-	createCategoryTool := tools.NewCreateCategoryTool(categoryService)
-	srv.AddTool(createCategoryTool.GetTool(), createCategoryTool.GetHandler())
-
-	listCategoriesResult := tools.NewListCategoriesTool(categoryService)
-	srv.AddTool(listCategoriesResult.GetTool(), listCategoriesResult.GetHandler())
-
-	getCategoryTool := tools.NewGetCategoryTool(categoryService)
-	srv.AddTool(getCategoryTool.GetTool(), getCategoryTool.GetHandler())
-
-	updateCategoryTool := tools.NewUpdateCategoryTool(categoryService)
-	srv.AddTool(updateCategoryTool.GetTool(), updateCategoryTool.GetHandler())
-
-	deleteCategoryTool := tools.NewDeleteCategoryTool(categoryService)
-	srv.AddTool(deleteCategoryTool.GetTool(), deleteCategoryTool.GetHandler())
+	manageCategoryTool := tools.NewManageCategoryTool(categoryService)
+	srv.AddTool(manageCategoryTool.GetTool(), manageCategoryTool.GetHandler())
 
 	// Company Tools
-	createCompanyTool := tools.NewCreateCompanyTool(companyService)
-	srv.AddTool(createCompanyTool.GetTool(), createCompanyTool.GetHandler())
-
-	listCompaniesTool := tools.NewListCompaniesTool(companyService)
-	srv.AddTool(listCompaniesTool.GetTool(), listCompaniesTool.GetHandler())
-
-	getCompanyTool := tools.NewGetCompanyTool(companyService)
-	srv.AddTool(getCompanyTool.GetTool(), getCompanyTool.GetHandler())
-
-	updateCompanyTool := tools.NewUpdateCompanyTool(companyService)
-	srv.AddTool(updateCompanyTool.GetTool(), updateCompanyTool.GetHandler())
-
-	deleteCompanyTool := tools.NewDeleteCompanyTool(companyService)
-	srv.AddTool(deleteCompanyTool.GetTool(), deleteCompanyTool.GetHandler())
+	manageCompanyTool := tools.NewManageCompanyTool(companyService)
+	srv.AddTool(manageCompanyTool.GetTool(), manageCompanyTool.GetHandler())
 
 	// Receiver Tools
-	createReceiverTool := tools.NewCreateReceiverTool(receiverService)
-	srv.AddTool(createReceiverTool.GetTool(), createReceiverTool.GetHandler())
-
-	listReceiversTool := tools.NewListReceiversTool(receiverService)
-	srv.AddTool(listReceiversTool.GetTool(), listReceiversTool.GetHandler())
-
-	getReceiverTool := tools.NewGetReceiverTool(receiverService)
-	srv.AddTool(getReceiverTool.GetTool(), getReceiverTool.GetHandler())
-
-	updateReceiverTool := tools.NewUpdateReceiverTool(receiverService)
-	srv.AddTool(updateReceiverTool.GetTool(), updateReceiverTool.GetHandler())
-
-	deleteReceiverTool := tools.NewDeleteReceiverTool(receiverService)
-	srv.AddTool(deleteReceiverTool.GetTool(), deleteReceiverTool.GetHandler())
+	manageReceiverTool := tools.NewManageReceiverTool(receiverService)
+	srv.AddTool(manageReceiverTool.GetTool(), manageReceiverTool.GetHandler())
 
 	// Invoice Tools
-	createInvoiceTool := tools.NewCreateInvoiceTool(invoiceService)
-	srv.AddTool(createInvoiceTool.GetTool(), createInvoiceTool.GetHandler())
-
-	listInvoicesTool := tools.NewListInvoicesTool(invoiceService)
-	srv.AddTool(listInvoicesTool.GetTool(), listInvoicesTool.GetHandler())
-
-	getInvoiceTool := tools.NewGetInvoiceTool(invoiceService)
-	srv.AddTool(getInvoiceTool.GetTool(), getInvoiceTool.GetHandler())
-
-	updateInvoiceTool := tools.NewUpdateInvoiceTool(invoiceService)
-	srv.AddTool(updateInvoiceTool.GetTool(), updateInvoiceTool.GetHandler())
-
-	deleteInvoiceTool := tools.NewDeleteInvoiceTool(invoiceService)
-	srv.AddTool(deleteInvoiceTool.GetTool(), deleteInvoiceTool.GetHandler())
-
-	searchInvoicesTool := tools.NewSearchInvoicesTool(invoiceService)
-	srv.AddTool(searchInvoicesTool.GetTool(), searchInvoicesTool.GetHandler())
-
-	updateInvoiceStatusTool := tools.NewUpdateInvoiceStatusTool(invoiceService)
-	srv.AddTool(updateInvoiceStatusTool.GetTool(), updateInvoiceStatusTool.GetHandler())
+	manageInvoiceTool := tools.NewManageInvoiceTool(invoiceService)
+	srv.AddTool(manageInvoiceTool.GetTool(), manageInvoiceTool.GetHandler())
 
 	// Invoice Item Tools
-	addInvoiceItemTool := tools.NewAddInvoiceItemTool(invoiceService)
-	srv.AddTool(addInvoiceItemTool.GetTool(), addInvoiceItemTool.GetHandler())
-
-	updateInvoiceItemTool := tools.NewUpdateInvoiceItemTool(invoiceService)
-	srv.AddTool(updateInvoiceItemTool.GetTool(), updateInvoiceItemTool.GetHandler())
-
-	deleteInvoiceItemTool := tools.NewDeleteInvoiceItemTool(invoiceService)
-	srv.AddTool(deleteInvoiceItemTool.GetTool(), deleteInvoiceItemTool.GetHandler())
+	manageInvoiceItemTool := tools.NewManageInvoiceItemTool(invoiceService)
+	srv.AddTool(manageInvoiceItemTool.GetTool(), manageInvoiceItemTool.GetHandler())
 
 	// Upload Tools
 	getPresignedURLTool := tools.NewGetPresignedURLTool(uploadService)
@@ -170,33 +110,8 @@ func (s *MCPServer) initializeTools(
 	srv.AddTool(advancedSearchTool.GetTool(), advancedSearchTool.GetHandler())
 
 	// Tag Tools
-	createTagTool := tools.NewCreateTagTool(tagService)
-	srv.AddTool(createTagTool.GetTool(), createTagTool.GetHandler())
-
-	listTagsTool := tools.NewListTagsTool(tagService)
-	srv.AddTool(listTagsTool.GetTool(), listTagsTool.GetHandler())
-
-	getTagTool := tools.NewGetTagTool(tagService)
-	srv.AddTool(getTagTool.GetTool(), getTagTool.GetHandler())
-
-	updateTagTool := tools.NewUpdateTagTool(tagService)
-	srv.AddTool(updateTagTool.GetTool(), updateTagTool.GetHandler())
-
-	deleteTagTool := tools.NewDeleteTagTool(tagService)
-	srv.AddTool(deleteTagTool.GetTool(), deleteTagTool.GetHandler())
-
-	addTagToInvoiceTool := tools.NewAddTagToInvoiceTool(tagService)
-	srv.AddTool(addTagToInvoiceTool.GetTool(), addTagToInvoiceTool.GetHandler())
-
-	removeTagFromInvoiceTool := tools.NewRemoveTagFromInvoiceTool(tagService)
-	srv.AddTool(removeTagFromInvoiceTool.GetTool(), removeTagFromInvoiceTool.GetHandler())
-
-	searchInvoicesByTagsTool := tools.NewSearchInvoicesByTagsTool(tagService)
-	srv.AddTool(searchInvoicesByTagsTool.GetTool(), searchInvoicesByTagsTool.GetHandler())
-
-	// Merge Receivers Tool
-	mergeReceiversTool := tools.NewMergeReceiversTool(receiverService)
-	srv.AddTool(mergeReceiversTool.GetTool(), mergeReceiversTool.GetHandler())
+	manageTagTool := tools.NewManageTagTool(tagService)
+	srv.AddTool(manageTagTool.GetTool(), manageTagTool.GetHandler())
 
 	s.server = srv
 }
@@ -224,136 +139,151 @@ func (s *MCPServer) SendMessageToAiClient(messages []mcp.SamplingMessage) error 
 func getToolInstructions(category string) string {
 	switch category {
 	case "category":
-		return `Category Management Tools:
+		return `Category Management - manage_categories tool:
 
-1. create_category - Create a new invoice category
-   Parameters: name (required), description, color
+A unified tool for managing invoice categories. Use the 'action' parameter to specify the operation.
 
-2. list_categories - List all categories with optional search
-   Parameters: keyword, limit, offset
+Actions:
+- create: Create a new invoice category
+  Parameters: name (required), description (required), color (required)
 
-3. get_category - Get a category by ID
-   Parameters: category_id (required)
+- list: List all categories with optional search
+  Parameters: keyword, limit, offset
 
-4. update_category - Update an existing category
-   Parameters: category_id (required), name, description, color
+- get: Get a category by ID
+  Parameters: category_id (required)
 
-5. delete_category - Delete a category
-   Parameters: category_id (required)`
+- update: Update an existing category
+  Parameters: category_id (required), name, description, color
+
+- delete: Delete a category
+  Parameters: category_id (required)`
 
 	case "company":
-		return `Company Management Tools:
+		return `Company Management - manage_companies tool:
 
-1. create_company - Create a new company
-   Parameters: name (required), address, email, phone, website, tax_id, notes
+A unified tool for managing companies. Use the 'action' parameter to specify the operation.
 
-2. list_companies - List all companies with optional search
-   Parameters: keyword, limit, offset
+Actions:
+- create: Create a new company
+  Parameters: name (required), address, email, phone, website, tax_id, notes
 
-3. get_company - Get a company by ID
-   Parameters: company_id (required)
+- list: List all companies with optional search
+  Parameters: keyword, limit, offset
 
-4. update_company - Update an existing company
-   Parameters: company_id (required), name, address, email, phone, website, tax_id, notes
+- get: Get a company by ID
+  Parameters: company_id (required)
 
-5. delete_company - Delete a company
-   Parameters: company_id (required)`
+- update: Update an existing company
+  Parameters: company_id (required), name, address, email, phone, website, tax_id, notes
+
+- delete: Delete a company
+  Parameters: company_id (required)`
 
 	case "receiver":
-		return `Receiver Management Tools:
+		return `Receiver Management - manage_receivers tool:
 
-1. create_receiver - Create a new invoice receiver
-   Parameters: name (required), is_organization (boolean, default false)
+A unified tool for managing invoice receivers. Use the 'action' parameter to specify the operation.
 
-2. list_receivers - List all receivers with optional search
-   Parameters: keyword, limit, offset
+Actions:
+- create: Create a new invoice receiver
+  Parameters: name (required), is_organization (boolean, default false)
 
-3. get_receiver - Get a receiver by ID
-   Parameters: receiver_id (required)
+- list: List all receivers with optional search
+  Parameters: keyword, limit, offset
 
-4. update_receiver - Update an existing receiver
-   Parameters: receiver_id (required), name, is_organization
+- get: Get a receiver by ID
+  Parameters: receiver_id (required)
 
-5. delete_receiver - Delete a receiver
-   Parameters: receiver_id (required)
+- update: Update an existing receiver
+  Parameters: receiver_id (required), name, is_organization, other_names
 
-6. merge_receivers - Merge multiple receivers into one
-   Parameters: target_id (required), source_ids (required array)
-   All invoices from source receivers will be moved to the target receiver.`
+- delete: Delete a receiver
+  Parameters: receiver_id (required)
+
+- merge: Merge multiple receivers into one
+  Parameters: target_id (required), source_ids (required array)
+  All invoices from source receivers will be moved to the target receiver.`
 
 	case "tag":
-		return `Tag Management Tools:
+		return `Tag Management - manage_tags tool:
 
-1. create_tag - Create a new invoice tag
-   Parameters: name (required), color (hex code, default #6B7280)
+A unified tool for managing invoice tags. Use the 'action' parameter to specify the operation.
 
-2. list_tags - List all tags with optional search
-   Parameters: keyword, limit, offset
+Actions:
+- create: Create a new invoice tag
+  Parameters: name (required), color (hex code, default #6B7280)
 
-3. get_tag - Get a tag by ID
-   Parameters: tag_id (required)
+- list: List all tags with optional search
+  Parameters: keyword, limit, offset
 
-4. update_tag - Update an existing tag
-   Parameters: tag_id (required), name, color
+- get: Get a tag by ID
+  Parameters: tag_id (required)
 
-5. delete_tag - Delete a tag
-   Parameters: tag_id (required)
+- update: Update an existing tag
+  Parameters: tag_id (required), name, color
 
-6. add_tag_to_invoice - Add a tag to an invoice
-   Parameters: invoice_id (required), tag_id (required)
+- delete: Delete a tag
+  Parameters: tag_id (required)
 
-7. remove_tag_from_invoice - Remove a tag from an invoice
-   Parameters: invoice_id (required), tag_id (required)
+- add_to_invoice: Add a tag to an invoice
+  Parameters: invoice_id (required), tag_id (required)
 
-8. search_invoices_by_tag - Find invoices with a specific tag
-   Parameters: tag_id (required), limit, offset`
+- remove_from_invoice: Remove a tag from an invoice
+  Parameters: invoice_id (required), tag_id (required)
+
+- search_invoices: Find invoices with a specific tag
+  Parameters: tag_id (required), limit, offset`
 
 	case "invoice":
-		return `Invoice Management Tools:
+		return `Invoice Management - manage_invoices tool:
 
-1. create_invoice - Create a new invoice
-   Parameters: title (required), description, amount, currency, category_id, company_id,
-               invoice_started_at, invoice_ended_at, original_download_link, tags,
-               status (paid/unpaid/overdue), due_date, items
+A unified tool for managing invoices. Use the 'action' parameter to specify the operation.
 
-2. list_invoices - List invoices with filtering and sorting
-   Parameters: keyword, category_id, company_id, status, sort_by, sort_order, limit, offset
+Actions:
+- create: Create a new invoice
+  Parameters: title (required), description, currency, category_id, company_id, receiver_id,
+              invoice_started_at, invoice_ended_at, original_download_link, tags,
+              status (paid/unpaid/overdue), due_date, items
 
-3. get_invoice - Get an invoice by ID with all details
-   Parameters: invoice_id (required)
+- list: List invoices with filtering and sorting
+  Parameters: keyword, category_id, company_id, receiver_id, status, sort_by, sort_order, limit, offset
 
-4. update_invoice - Update an existing invoice
-   Parameters: invoice_id (required), and any fields to update
+- get: Get an invoice by ID with all details
+  Parameters: invoice_id (required)
 
-5. delete_invoice - Delete an invoice
-   Parameters: invoice_id (required)
+- update: Update an existing invoice
+  Parameters: invoice_id (required), and any fields to update
 
-6. search_invoices - Full-text search across invoices
-   Parameters: query (required)
+- delete: Delete an invoice
+  Parameters: invoice_id (required)
 
-7. update_invoice_status - Update only the status of an invoice
-   Parameters: invoice_id (required), status (required: paid/unpaid/overdue)
+- search: Full-text search across invoices
+  Parameters: query (required)
 
-Invoice Item Tools:
-8. add_invoice_item - Add an item to an invoice
-   Parameters: invoice_id (required), description (required), quantity, unit_price
+- update_status: Update only the status of an invoice
+  Parameters: invoice_id (required), status (required: paid/unpaid/overdue)
 
-9. update_invoice_item - Update an invoice item
-   Parameters: item_id (required), description, quantity, unit_price
+Invoice Item Management - manage_invoice_items tool:
 
-10. delete_invoice_item - Delete an invoice item
-    Parameters: item_id (required)
+A unified tool for managing invoice items. Use the 'action' parameter to specify the operation.
+
+Actions:
+- add: Add an item to an invoice
+  Parameters: invoice_id (required), description (required), quantity, unit_price
+
+- update: Update an invoice item
+  Parameters: item_id (required), description, quantity, unit_price, target_amount
+
+- delete: Delete an invoice item
+  Parameters: item_id (required)
 
 Statistics Tools:
-11. invoice_statistics - Get invoice statistics with time period filtering, grouping, and aggregations
-    Parameters: period (last_day/last_week/last_month/last_year), days, category_id, company_id,
-                receiver_id, status, keyword, group_by (day/week/month/category/company/receiver),
-                include_aggregations
-    Examples:
-    - "How much did I spend last week?" → period: "last_week"
-    - "Show daily spending for 7 days" → period: "last_week", group_by: "day"
-    - "Max spend last week?" → period: "last_week", include_aggregations: true
-    - "Electricity invoices last month" → period: "last_month", keyword: "electricity"`
+- invoice_statistics: Get invoice statistics with time period filtering, grouping, and aggregations
+  Parameters: period (last_day/last_week/last_month/last_year), days, category_id, company_id,
+              receiver_id, status, keyword, group_by (day/week/month/category/company/receiver),
+              include_aggregations
+- advanced_invoice_search: Search across title, category, company, receiver, tags`
 
 	case "upload":
 		return `File Upload Tools:
@@ -368,60 +298,40 @@ Statistics Tools:
 	case "all":
 		return `Invoice Management MCP Tools Overview:
 
-This MCP server provides tools for managing invoices, categories, companies, receivers, tags, and file uploads.
+This MCP server provides unified tools for managing invoices, categories, companies, receivers, tags, and file uploads.
+Each resource has a single tool with an 'action' parameter for CRUD operations.
 
-CATEGORY MANAGEMENT (5 tools):
-- create_category: Create a new category
-- list_categories: List categories with search
-- get_category: Get category details
-- update_category: Update a category
-- delete_category: Delete a category
+CATEGORY MANAGEMENT (1 tool: manage_categories):
+  Actions: create, list, get, update, delete
+  Parameters: action (required), category_id, name, description, color, keyword, limit, offset
 
-COMPANY MANAGEMENT (5 tools):
-- create_company: Create a new company
-- list_companies: List companies with search
-- get_company: Get company details
-- update_company: Update a company
-- delete_company: Delete a company
+COMPANY MANAGEMENT (1 tool: manage_companies):
+  Actions: create, list, get, update, delete
+  Parameters: action (required), company_id, name, address, email, phone, website, tax_id, notes, keyword, limit, offset
 
-RECEIVER MANAGEMENT (6 tools):
-- create_receiver: Create a new receiver
-- list_receivers: List receivers with search
-- get_receiver: Get receiver details
-- update_receiver: Update a receiver
-- delete_receiver: Delete a receiver
-- merge_receivers: Merge multiple receivers into one
+RECEIVER MANAGEMENT (1 tool: manage_receivers):
+  Actions: create, list, get, update, delete, merge
+  Parameters: action (required), receiver_id, name, is_organization, other_names, keyword, limit, offset, target_id, source_ids
 
-TAG MANAGEMENT (8 tools):
-- create_tag: Create a new tag with name and color
-- list_tags: List tags with search
-- get_tag: Get tag details
-- update_tag: Update a tag
-- delete_tag: Delete a tag
-- add_tag_to_invoice: Associate a tag with an invoice
-- remove_tag_from_invoice: Remove a tag from an invoice
-- search_invoices_by_tag: Find invoices with a specific tag
+TAG MANAGEMENT (1 tool: manage_tags):
+  Actions: create, list, get, update, delete, add_to_invoice, remove_from_invoice, search_invoices
+  Parameters: action (required), tag_id, name, color, keyword, limit, offset, invoice_id
 
-INVOICE MANAGEMENT (10 tools):
-- create_invoice: Create a new invoice with items
-- list_invoices: List with filters and sorting
-- get_invoice: Get invoice with all details
-- update_invoice: Update an invoice
-- delete_invoice: Delete an invoice
-- search_invoices: Full-text search
-- update_invoice_status: Change invoice status
-- add_invoice_item: Add item to invoice
-- update_invoice_item: Update an item
-- delete_invoice_item: Delete an item
+INVOICE MANAGEMENT (1 tool: manage_invoices):
+  Actions: create, list, get, update, delete, search, update_status
+  Parameters: action (required), invoice_id, title, description, currency, category_id, company_id,
+              receiver_id, status, due_date, items, tags, keyword, sort_by, sort_order, limit, offset, query
 
-FILE UPLOAD (1 tool):
-- get_presigned_url: Get URL for file upload
+INVOICE ITEM MANAGEMENT (1 tool: manage_invoice_items):
+  Actions: add, update, delete
+  Parameters: action (required), invoice_id, item_id, description, quantity, unit_price, target_amount
+
+FILE UPLOAD (1 tool: get_presigned_url):
+  Parameters: filename (required), content_type
 
 STATISTICS (2 tools):
 - invoice_statistics: Get statistics with period/grouping/aggregations
-  Supports: "last_week day by day", "max spend last month", "compare by category"
 - advanced_invoice_search: Search across title, category, company, receiver, tags
-  Supports: "How much did I spend on Marriott?", "Total travel expenses"
 
 All tools require authentication. Invoices are user-scoped.`
 

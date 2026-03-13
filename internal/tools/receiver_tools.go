@@ -11,24 +11,32 @@ import (
 	"github.com/rxtech-lab/invoice-management/internal/services"
 )
 
-// CreateReceiverTool handles receiver creation
-type CreateReceiverTool struct {
+// ManageReceiverTool is a unified CRUD tool for invoice receivers
+type ManageReceiverTool struct {
 	service services.ReceiverService
 }
 
-func NewCreateReceiverTool(service services.ReceiverService) *CreateReceiverTool {
-	return &CreateReceiverTool{service: service}
+func NewManageReceiverTool(service services.ReceiverService) *ManageReceiverTool {
+	return &ManageReceiverTool{service: service}
 }
 
-func (t *CreateReceiverTool) GetTool() mcp.Tool {
-	return mcp.NewTool("create_receiver",
-		mcp.WithDescription("Create a new invoice receiver. If a receiver with the same name (or alias) already exists, returns the existing receiver instead of creating a duplicate."),
-		mcp.WithString("name", mcp.Required(), mcp.Description("Receiver name")),
+func (t *ManageReceiverTool) GetTool() mcp.Tool {
+	return mcp.NewTool("manage_receivers",
+		mcp.WithDescription("Unified CRUD tool for invoice receivers. Use the 'action' parameter to specify the operation: create, list, get, update, delete, or merge."),
+		mcp.WithString("action", mcp.Required(), mcp.Description("The operation to perform: create, list, get, update, delete, or merge"), mcp.Enum("create", "list", "get", "update", "delete", "merge")),
+		mcp.WithNumber("receiver_id", mcp.Description("Receiver ID (required for get, update, delete)")),
+		mcp.WithString("name", mcp.Description("Receiver name (required for create, optional for update)")),
 		mcp.WithBoolean("is_organization", mcp.Description("Whether the receiver is an organization (default: false)")),
+		mcp.WithArray("other_names", mcp.Description("Alternative names/aliases for the receiver (from merged receivers, used with update)"), mcp.Items(map[string]any{"type": "string"})),
+		mcp.WithString("keyword", mcp.Description("Search keyword (used with list)")),
+		mcp.WithNumber("limit", mcp.Description("Maximum number of results, default 50 (used with list)")),
+		mcp.WithNumber("offset", mcp.Description("Offset for pagination (used with list)")),
+		mcp.WithNumber("target_id", mcp.Description("ID of the receiver to keep (required for merge)")),
+		mcp.WithArray("source_ids", mcp.Description("IDs of receivers to merge into target (will be deleted, required for merge)"), mcp.Items(map[string]any{"type": "number"})),
 	)
 }
 
-func (t *CreateReceiverTool) GetHandler() server.ToolHandlerFunc {
+func (t *ManageReceiverTool) GetHandler() server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		userID := getUserIDFromContext(ctx)
 		if userID == "" {
@@ -36,220 +44,170 @@ func (t *CreateReceiverTool) GetHandler() server.ToolHandlerFunc {
 		}
 
 		args := getArgsMap(request.Params.Arguments)
-		name, _ := args["name"].(string)
-		isOrganization, _ := args["is_organization"].(bool)
+		action, _ := args["action"].(string)
 
-		// Check for existing receiver with same name or alias
-		existingReceiver, err := t.service.FindByNameOrAlias(userID, name)
-		if err == nil && existingReceiver != nil {
-			// Found an existing receiver - return it instead of creating duplicate
-			result, _ := json.Marshal(map[string]interface{}{
-				"duplicate_found":   true,
-				"existing_receiver": existingReceiver,
-				"message":           fmt.Sprintf("A receiver with name '%s' already exists (or is an alias of receiver '%s'). Use the existing receiver instead.", name, existingReceiver.Name),
-			})
-			return mcp.NewToolResultText(string(result)), nil
+		switch action {
+		case "create":
+			return t.handleCreate(userID, args)
+		case "list":
+			return t.handleList(userID, args)
+		case "get":
+			return t.handleGet(userID, args)
+		case "update":
+			return t.handleUpdate(userID, args)
+		case "delete":
+			return t.handleDelete(userID, args)
+		case "merge":
+			return t.handleMerge(userID, args)
+		default:
+			return mcp.NewToolResultError(fmt.Sprintf("Unknown action: %s. Must be one of: create, list, get, update, delete, merge", action)), nil
 		}
-
-		// No duplicate found, proceed with creation
-		receiver := &models.InvoiceReceiver{
-			Name:           name,
-			IsOrganization: isOrganization,
-		}
-
-		if err := t.service.CreateReceiver(userID, receiver); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to create receiver: %v", err)), nil
-		}
-
-		result, _ := json.Marshal(receiver)
-		return mcp.NewToolResultText(string(result)), nil
 	}
 }
 
-// ListReceiversTool handles listing receivers
-type ListReceiversTool struct {
-	service services.ReceiverService
-}
+func (t *ManageReceiverTool) handleCreate(userID string, args map[string]interface{}) (*mcp.CallToolResult, error) {
+	name, _ := args["name"].(string)
+	isOrganization, _ := args["is_organization"].(bool)
 
-func NewListReceiversTool(service services.ReceiverService) *ListReceiversTool {
-	return &ListReceiversTool{service: service}
-}
-
-func (t *ListReceiversTool) GetTool() mcp.Tool {
-	return mcp.NewTool("list_receivers",
-		mcp.WithDescription("List invoice receivers with optional search"),
-		mcp.WithString("keyword", mcp.Description("Search keyword")),
-		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default 50)")),
-		mcp.WithNumber("offset", mcp.Description("Offset for pagination")),
-	)
-}
-
-func (t *ListReceiversTool) GetHandler() server.ToolHandlerFunc {
-	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		userID := getUserIDFromContext(ctx)
-		if userID == "" {
-			return mcp.NewToolResultError("Authentication required"), nil
-		}
-
-		args := getArgsMap(request.Params.Arguments)
-		keyword, _ := args["keyword"].(string)
-		limit := getIntArg(args, "limit", 50)
-		offset := getIntArg(args, "offset", 0)
-
-		receivers, total, err := t.service.ListReceivers(userID, keyword, limit, offset)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to list receivers: %v", err)), nil
-		}
-
+	// Check for existing receiver with same name or alias
+	existingReceiver, err := t.service.FindByNameOrAlias(userID, name)
+	if err == nil && existingReceiver != nil {
 		result, _ := json.Marshal(map[string]interface{}{
-			"data":   receivers,
-			"total":  total,
-			"limit":  limit,
-			"offset": offset,
+			"duplicate_found":   true,
+			"existing_receiver": existingReceiver,
+			"message":           fmt.Sprintf("A receiver with name '%s' already exists (or is an alias of receiver '%s'). Use the existing receiver instead.", name, existingReceiver.Name),
 		})
 		return mcp.NewToolResultText(string(result)), nil
 	}
-}
 
-// GetReceiverTool handles getting a single receiver
-type GetReceiverTool struct {
-	service services.ReceiverService
-}
-
-func NewGetReceiverTool(service services.ReceiverService) *GetReceiverTool {
-	return &GetReceiverTool{service: service}
-}
-
-func (t *GetReceiverTool) GetTool() mcp.Tool {
-	return mcp.NewTool("get_receiver",
-		mcp.WithDescription("Get a receiver by ID"),
-		mcp.WithNumber("receiver_id", mcp.Required(), mcp.Description("Receiver ID")),
-	)
-}
-
-func (t *GetReceiverTool) GetHandler() server.ToolHandlerFunc {
-	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		userID := getUserIDFromContext(ctx)
-		if userID == "" {
-			return mcp.NewToolResultError("Authentication required"), nil
-		}
-
-		args := getArgsMap(request.Params.Arguments)
-		receiverID := getUintArg(args, "receiver_id")
-		if receiverID == 0 {
-			return mcp.NewToolResultError("receiver_id is required"), nil
-		}
-
-		receiver, err := t.service.GetReceiverByID(userID, receiverID)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Receiver not found: %v", err)), nil
-		}
-
-		result, _ := json.Marshal(receiver)
-		return mcp.NewToolResultText(string(result)), nil
+	receiver := &models.InvoiceReceiver{
+		Name:           name,
+		IsOrganization: isOrganization,
 	}
+
+	if err := t.service.CreateReceiver(userID, receiver); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to create receiver: %v", err)), nil
+	}
+
+	result, _ := json.Marshal(receiver)
+	return mcp.NewToolResultText(string(result)), nil
 }
 
-// UpdateReceiverTool handles receiver updates
-type UpdateReceiverTool struct {
-	service services.ReceiverService
+func (t *ManageReceiverTool) handleList(userID string, args map[string]interface{}) (*mcp.CallToolResult, error) {
+	keyword, _ := args["keyword"].(string)
+	limit := getIntArg(args, "limit", 50)
+	offset := getIntArg(args, "offset", 0)
+
+	receivers, total, err := t.service.ListReceivers(userID, keyword, limit, offset)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to list receivers: %v", err)), nil
+	}
+
+	result, _ := json.Marshal(map[string]interface{}{
+		"data":   receivers,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+	return mcp.NewToolResultText(string(result)), nil
 }
 
-func NewUpdateReceiverTool(service services.ReceiverService) *UpdateReceiverTool {
-	return &UpdateReceiverTool{service: service}
+func (t *ManageReceiverTool) handleGet(userID string, args map[string]interface{}) (*mcp.CallToolResult, error) {
+	receiverID := getUintArg(args, "receiver_id")
+	if receiverID == 0 {
+		return mcp.NewToolResultError("receiver_id is required"), nil
+	}
+
+	receiver, err := t.service.GetReceiverByID(userID, receiverID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Receiver not found: %v", err)), nil
+	}
+
+	result, _ := json.Marshal(receiver)
+	return mcp.NewToolResultText(string(result)), nil
 }
 
-func (t *UpdateReceiverTool) GetTool() mcp.Tool {
-	return mcp.NewTool("update_receiver",
-		mcp.WithDescription("Update an existing receiver. Can modify name, organization status, and alternative names (aliases)."),
-		mcp.WithNumber("receiver_id", mcp.Required(), mcp.Description("Receiver ID")),
-		mcp.WithString("name", mcp.Description("Receiver name")),
-		mcp.WithBoolean("is_organization", mcp.Description("Whether the receiver is an organization")),
-		mcp.WithArray("other_names", mcp.Description("Alternative names/aliases for the receiver (from merged receivers)"), mcp.Items(map[string]any{"type": "string"})),
-	)
-}
+func (t *ManageReceiverTool) handleUpdate(userID string, args map[string]interface{}) (*mcp.CallToolResult, error) {
+	receiverID := getUintArg(args, "receiver_id")
+	if receiverID == 0 {
+		return mcp.NewToolResultError("receiver_id is required"), nil
+	}
 
-func (t *UpdateReceiverTool) GetHandler() server.ToolHandlerFunc {
-	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		userID := getUserIDFromContext(ctx)
-		if userID == "" {
-			return mcp.NewToolResultError("Authentication required"), nil
-		}
+	existing, err := t.service.GetReceiverByID(userID, receiverID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Receiver not found: %v", err)), nil
+	}
 
-		args := getArgsMap(request.Params.Arguments)
-		receiverID := getUintArg(args, "receiver_id")
-		if receiverID == 0 {
-			return mcp.NewToolResultError("receiver_id is required"), nil
-		}
+	if name, ok := args["name"].(string); ok && name != "" {
+		existing.Name = name
+	}
+	if isOrganization, ok := args["is_organization"].(bool); ok {
+		existing.IsOrganization = isOrganization
+	}
 
-		// Get existing receiver
-		existing, err := t.service.GetReceiverByID(userID, receiverID)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Receiver not found: %v", err)), nil
-		}
-
-		// Update fields if provided
-		if name, ok := args["name"].(string); ok && name != "" {
-			existing.Name = name
-		}
-		if isOrganization, ok := args["is_organization"].(bool); ok {
-			existing.IsOrganization = isOrganization
-		}
-
-		// Handle other_names array
-		if otherNamesRaw, ok := args["other_names"].([]interface{}); ok {
-			var otherNames []string
-			for _, v := range otherNamesRaw {
-				if s, ok := v.(string); ok {
-					otherNames = append(otherNames, s)
-				}
+	if otherNamesRaw, ok := args["other_names"].([]interface{}); ok {
+		var otherNames []string
+		for _, v := range otherNamesRaw {
+			if s, ok := v.(string); ok {
+				otherNames = append(otherNames, s)
 			}
-			existing.OtherNames = otherNames
 		}
-
-		if err := t.service.UpdateReceiver(userID, existing); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to update receiver: %v", err)), nil
-		}
-
-		updated, _ := t.service.GetReceiverByID(userID, receiverID)
-		result, _ := json.Marshal(updated)
-		return mcp.NewToolResultText(string(result)), nil
+		existing.OtherNames = otherNames
 	}
-}
 
-// DeleteReceiverTool handles receiver deletion
-type DeleteReceiverTool struct {
-	service services.ReceiverService
-}
-
-func NewDeleteReceiverTool(service services.ReceiverService) *DeleteReceiverTool {
-	return &DeleteReceiverTool{service: service}
-}
-
-func (t *DeleteReceiverTool) GetTool() mcp.Tool {
-	return mcp.NewTool("delete_receiver",
-		mcp.WithDescription("Delete a receiver"),
-		mcp.WithNumber("receiver_id", mcp.Required(), mcp.Description("Receiver ID")),
-	)
-}
-
-func (t *DeleteReceiverTool) GetHandler() server.ToolHandlerFunc {
-	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		userID := getUserIDFromContext(ctx)
-		if userID == "" {
-			return mcp.NewToolResultError("Authentication required"), nil
-		}
-
-		args := getArgsMap(request.Params.Arguments)
-		receiverID := getUintArg(args, "receiver_id")
-		if receiverID == 0 {
-			return mcp.NewToolResultError("receiver_id is required"), nil
-		}
-
-		if err := t.service.DeleteReceiver(userID, receiverID); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to delete receiver: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(`{"success": true, "message": "Receiver deleted"}`), nil
+	if err := t.service.UpdateReceiver(userID, existing); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update receiver: %v", err)), nil
 	}
+
+	updated, _ := t.service.GetReceiverByID(userID, receiverID)
+	result, _ := json.Marshal(updated)
+	return mcp.NewToolResultText(string(result)), nil
+}
+
+func (t *ManageReceiverTool) handleDelete(userID string, args map[string]interface{}) (*mcp.CallToolResult, error) {
+	receiverID := getUintArg(args, "receiver_id")
+	if receiverID == 0 {
+		return mcp.NewToolResultError("receiver_id is required"), nil
+	}
+
+	if err := t.service.DeleteReceiver(userID, receiverID); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to delete receiver: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(`{"success": true, "message": "Receiver deleted"}`), nil
+}
+
+func (t *ManageReceiverTool) handleMerge(userID string, args map[string]interface{}) (*mcp.CallToolResult, error) {
+	targetID := getUintArg(args, "target_id")
+	if targetID == 0 {
+		return mcp.NewToolResultError("target_id is required"), nil
+	}
+
+	sourceIDsRaw, ok := args["source_ids"].([]interface{})
+	if !ok || len(sourceIDsRaw) == 0 {
+		return mcp.NewToolResultError("source_ids is required and must be a non-empty array"), nil
+	}
+
+	sourceIDs := make([]uint, 0, len(sourceIDsRaw))
+	for _, v := range sourceIDsRaw {
+		if id, ok := v.(float64); ok && id > 0 {
+			sourceIDs = append(sourceIDs, uint(id))
+		}
+	}
+
+	if len(sourceIDs) == 0 {
+		return mcp.NewToolResultError("source_ids must contain valid IDs"), nil
+	}
+
+	receiver, affectedCount, err := t.service.MergeReceivers(userID, targetID, sourceIDs)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to merge receivers: %v", err)), nil
+	}
+
+	result, _ := json.Marshal(map[string]interface{}{
+		"receiver":          receiver,
+		"merged_count":      len(sourceIDs),
+		"invoices_affected": affectedCount,
+	})
+	return mcp.NewToolResultText(string(result)), nil
 }
