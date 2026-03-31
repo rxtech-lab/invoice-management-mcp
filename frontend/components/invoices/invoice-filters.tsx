@@ -63,6 +63,7 @@ export function InvoiceFilters({
   }, [keyword]);
 
   // Update URL with new params (treat "all" as clearing the filter)
+  // Also resets to page 1 when filters change
   const updateParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([key, value]) => {
@@ -72,6 +73,8 @@ export function InvoiceFilters({
         params.delete(key);
       }
     });
+    // Reset to page 1 when filters change
+    params.delete("page");
     router.push(`/invoices?${params.toString()}`);
   };
 
